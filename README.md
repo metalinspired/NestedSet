@@ -11,7 +11,7 @@ This library allows you to manipulate records in database using [Nested set mode
 ## Instalation
 
 ```bash
-$ composer require metalinspired\NestedSet
+$ composer require metalinspired/nested-set
 ```
 
 # Usage
