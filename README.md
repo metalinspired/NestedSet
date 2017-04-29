@@ -8,7 +8,7 @@ This library allows you to manipulate records in database using [Nested set mode
 
 * PHP >= 5.6
 
-## Instalation
+## Installation
 
 ```bash
 $ composer require metalinspired/nested-set
