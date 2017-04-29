@@ -4,8 +4,6 @@
 
 This library allows you to manipulate records in database using [Nested set model](https://en.wikipedia.org/wiki/Nested_set_model)
 
-Currently only MySql is supported
-
 ## Requirements
 
 * PHP >= 5.6
@@ -40,7 +38,7 @@ $nestedSet = new NestedSet($pdo, 'table');
 /*
  * Warning: Call this method only on empty table and only once!
  */
-$rootNodeId = $nestedSet->createRootnode();
+$rootNodeId = $nestedSet->createRootNode();
 ```
 
 ### Inserting node
@@ -70,8 +68,8 @@ $nestedSet->move($childNode, $nodeId, $nestedSet::MOVE_AFTER);
 /*
  * Delete a child node (that no longer is child node actually)
  * Note: If node has children/leafs it is your responsibility
- *           to move them to new location because delete method
- *           will delete them as well
+ *       to move them to new location because delete method
+ *       will delete them as well
  */
 $nestedSet->delete($childNode);
 ```
