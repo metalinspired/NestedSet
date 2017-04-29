@@ -446,7 +446,7 @@ class NestedSet
         $leftColumn = $this->quoteName($this->getLeftColumn());
         $rightColumn = $this->quoteName($this->getRightColumn());
 
-        $query = "INSERT INTO {$table} SET {$leftColumn} = 1, {$rightColumn} = 2";
+        $query = "INSERT INTO {$table} ({$leftColumn}, {$rightColumn}) VALUES (1, 2)";
 
         return $this->executeInsert($query);
     }
