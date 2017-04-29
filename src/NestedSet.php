@@ -23,6 +23,13 @@ class NestedSet
     protected $pdo;
 
     /**
+     * Name of a driver that PDO instance is using
+     *
+     * @var string
+     */
+    protected $driverName;
+
+    /**
      * Name of a table used to execute queries
      *
      * @var string
@@ -61,7 +68,7 @@ class NestedSet
     public function __construct(PDO $pdo = null, $table = null, array $options = null)
     {
         if (null !== $pdo) {
-            $this->pdo = $pdo;
+            $this->setPdo($pdo);
         }
 
         if (null !== $table) {
@@ -93,7 +100,14 @@ class NestedSet
      */
     public function setPdo(PDO $pdo)
     {
+        $driverName = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+
+        if (!in_array($driverName, ['mysql', 'dblib', 'sqlite', 'oci'])) {
+            throw new Exception\RuntimeException('Driver not supported');
+        }
+
         $this->pdo = $pdo;
+        $this->driverName = $driverName;
     }
 
     /**
@@ -278,7 +292,22 @@ class NestedSet
      */
     public function quoteName($name)
     {
-        return '`' . str_replace('`', '``', $name) . '`';
+        switch ($this->driverName) {
+            case 'mysql':
+                $name = '`' . str_replace('`', '``', $name) . '`';
+                break;
+            case 'dblib': // MS SQL Server
+            case 'sqlite':
+                $name = '[' . str_replace(']', ']]', $name) . ']';
+                break;
+            case 'oci':
+                $name = '"' . str_replace('"', '""', $name) . '"';
+                break;
+            default:
+                throw new Exception\RuntimeException('No PDO instance is set');
+        }
+
+        return $name;
     }
 
     /**
