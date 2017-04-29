@@ -1,0 +1,6 @@
+.idea/
+vendor/
+build/
+composer.lock
+*.phar
+phpunit.xml

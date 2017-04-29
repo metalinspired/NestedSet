@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="http://schema.phpunit.de/6.1/phpunit.xsd"
+         bootstrap="./test/bootstrap.php"
+         colors="true">
+
+    <php>
+        <var name="DB_DSN" value="mysql:dbname=test;host=localhost"/>
+        <var name="DB_USER" value=""/>
+        <var name="DB_PASSWORD" value=""/>
+        <var name="DB_NAME" value="test"/>
+        <var name="DB_TABLE" value="zend-nested-set"/>
+    </php>
+
+    <testsuites>
+        <testsuite name="NestedSet Test Suite">
+            <directory>./test/</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>
