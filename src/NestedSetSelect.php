@@ -40,13 +40,13 @@ class NestedSetSelect
     }
 
     /**
-     * Finds immediate children of a node
+     * Find immediate children of a node
      *
      * @param int $id Node identifier
      * @param string|null $table Table name
      * @param int $fetchStyle PDO fetch style
      * @param bool $includeParent Set to true to include the node whose children are being searched for in result
-     * @return mixed
+     * @return array
      */
     public function findChildren($id, $table = null, $fetchStyle = self::FETCH_DEFAULT, $includeParent = false)
     {
@@ -85,7 +85,7 @@ class NestedSetSelect
      * @param string|null $table Table name
      * @param int $fetchStyle PDO fetch style
      * @param bool $includeParent Set to true to include the node whose descendants are being searched for in result
-     * @return mixed
+     * @return array
      */
     public function findDescendants($id, $table = null, $fetchStyle = self::FETCH_DEFAULT, $includeParent = false)
     {
@@ -118,13 +118,13 @@ class NestedSetSelect
     }
 
     /**
-     * Finds node parent
-     * Proxies to findAncestors()
+     * Find parent of a node
+     * Proxies to findAncestors() with limit to return only first node found
      *
      * @param int $id Node identifier
      * @param string|null $table Table name
      * @param int $fetchStyle PDO fetch style
-     * @param bool $includeChild Set to true to include the node whose parent are being searched for in result
+     * @param bool $includeChild Set to true to include the node whose parent are searched for in result
      * @return mixed
      */
     public function findParent($id, $table = null, $fetchStyle = self::FETCH_DEFAULT, $includeChild = false)
@@ -133,12 +133,12 @@ class NestedSetSelect
     }
 
     /**
-     * Finds node ancestors
+     * Find ancestors of a node
      *
      * @param int $id Node identifier
      * @param string|null $table Table name
      * @param int $fetchStyle PDO fetch style
-     * @param bool $includeChild Set to true to include the node whose ancestors are being searched for in result
+     * @param bool $includeChild Set to true to include the node whose ancestors are searched for in result
      * @param int|null $limit Limit results to N of ancestors
      * @return mixed
      */
@@ -186,6 +186,15 @@ class NestedSetSelect
         return $this->executeSelect($query, $fetchStyle, $fetchMode);
     }
 
+    /**
+     * Find siblings of a node
+     *
+     * @param int $id Node identifier
+     * @param string|null $table Table name
+     * @param int $fetchStyle PDO fetch style
+     * @param bool $includeCurrent Set to true to include the node whose siblings are searched for in result
+     * @return array
+     */
     public function findSiblings($id, $table = null, $fetchStyle = self::FETCH_DEFAULT, $includeCurrent = false)
     {
         if (!is_int($id)) {
@@ -227,6 +236,14 @@ class NestedSetSelect
         return $this->executeSelect($query, $fetchStyle, NestedSet::FETCH_MODE_ALL);
     }
 
+    /**
+     * Find previous sibling of a node
+     *
+     * @param int $id Node identifier
+     * @param string|null $table Table name
+     * @param int $fetchStyle PDO fetch style
+     * @return mixed
+     */
     public function findPrevSibling($id, $table = null, $fetchStyle = self::FETCH_DEFAULT)
     {
         if (!is_int($id)) {
@@ -253,6 +270,13 @@ class NestedSetSelect
         return $this->executeSelect($query, $fetchStyle);
     }
 
+    /**
+     * Find next sibling of a node
+     * @param int $id Node identifier
+     * @param string|null $table Table name
+     * @param int $fetchStyle PDO fetch style
+     * @return mixed
+     */
     public function findNextSibling($id, $table = null, $fetchStyle = self::FETCH_DEFAULT)
     {
         if (!is_int($id)) {
@@ -279,6 +303,14 @@ class NestedSetSelect
         return $this->executeSelect($query, $fetchStyle);
     }
 
+    /**
+     * Find first child of a node
+     *
+     * @param int $id Node identifier
+     * @param string|null $table Table name
+     * @param int $fetchStyle PDO fetch style
+     * @return mixed
+     */
     public function findFirstChild($id, $table = null, $fetchStyle = self::FETCH_DEFAULT)
     {
         if (!is_int($id)) {
@@ -303,6 +335,14 @@ class NestedSetSelect
         return $this->executeSelect($query, $fetchStyle);
     }
 
+    /**
+     * Find last child of a node
+     *
+     * @param int $id Node identifier
+     * @param string|null $table Table name
+     * @param int $fetchStyle PDO fetch style
+     * @return mixed
+     */
     public function findLastChild($id, $table = null, $fetchStyle = self::FETCH_DEFAULT)
     {
         if (!is_int($id)) {
