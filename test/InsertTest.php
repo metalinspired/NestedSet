@@ -3,7 +3,7 @@
 namespace metalinspired\NestedSetTest;
 
 class InsertTest
-    extends AbstractTest
+    extends AbstractNestedSetTest
 {
     public function getDataSet()
     {
@@ -20,6 +20,21 @@ class InsertTest
         // Insert a second level node in every first level node
         for ($i = 2; $i < 12; $i++) {
             self::$nestedSet->insert(['value' => 'Sub node ' . ($i - 2)], $i);
+        }
+
+        // Add five more children to Node 1
+        for ($i = 1; $i < 6; $i++) {
+            self::$nestedSet->insert(['value' => 'Extra sub ' . $i], 3);
+        }
+
+        // Add five more children to Node 4
+        for ($i = 1; $i < 6; $i++) {
+            self::$nestedSet->insert(['value' => 'Extra sub ' . $i], 6);
+        }
+
+        // Add five children to Extra node 2 (Node 1)
+        for ($i=1; $i<6; $i++) {
+            self::$nestedSet->insert(['value' => 'Extra extra sub ' . $i], 23);
         }
 
         $this->assertTablesEqual(

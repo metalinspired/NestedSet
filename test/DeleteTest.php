@@ -3,7 +3,7 @@
 namespace metalinspired\NestedSetTest;
 
 class DeleteTest
-    extends AbstractTest
+    extends AbstractNestedSetTest
 {
     public function getDataSet()
     {
@@ -12,14 +12,14 @@ class DeleteTest
 
     public function testDelete()
     {
-        $rows = self::$nestedSet->delete(6);
+        $rows = self::$nestedSet->delete(3);
 
         $this->assertTablesEqual(
             $this->createMySQLXMLDataSet(__DIR__ . '/Fixture/Delete.xml')->getTable($GLOBALS[self::DB_TABLE]),
             $this->getQueryTable()
         );
 
-        $this->assertEquals( 2, $rows);
+        $this->assertEquals( 12, $rows);
     }
 
     /**

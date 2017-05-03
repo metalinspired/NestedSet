@@ -5,7 +5,7 @@ namespace metalinspired\NestedSetTest;
 use metalinspired\NestedSet\NestedSet;
 
 class MoveTest
-    extends AbstractTest
+    extends AbstractNestedSetTest
 {
     public function getDataSet()
     {
@@ -21,7 +21,7 @@ class MoveTest
             $this->getQueryTable()
         );
 
-        $this->assertEquals( 2, $rows);
+        $this->assertEquals( 12, $rows);
     }
 
     public function testMoveNodeBefore()

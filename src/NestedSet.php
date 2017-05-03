@@ -3,9 +3,9 @@
 namespace metalinspired\NestedSet;
 
 use metalinspired\NestedSet\Exception;
-use PDO;
 
 class NestedSet
+    extends AbstractNestedSet
 {
     /**
      * Constants for move method
@@ -14,341 +14,6 @@ class NestedSet
         MOVE_BEFORE = 'before',
         MOVE_CHILD = 'child',
         MOVE_DEFAULT = self::MOVE_AFTER;
-
-    /**
-     * PDO instance
-     *
-     * @var PDO
-     */
-    protected $pdo;
-
-    /**
-     * Name of a driver that PDO instance is using
-     *
-     * @var string
-     */
-    protected $driverName;
-
-    /**
-     * Name of a table used to execute queries
-     *
-     * @var string
-     */
-    protected $table;
-
-    /**
-     * Column name for identifiers of nodes
-     *
-     * @var string
-     */
-    protected $idColumn = 'id';
-
-    /**
-     * Column name for left values of nodes
-     *
-     * @var string
-     */
-    protected $leftColumn = 'lft';
-
-    /**
-     * Column name for right values of nodes
-     *
-     * @var string
-     */
-    protected $rightColumn = 'rgt';
-
-    /**
-     * NestedSet constructor
-     *
-     * @param PDO $pdo
-     * @param string|null $table
-     * @param array $options
-     * @throws Exception\InvalidArgumentException
-     */
-    public function __construct(PDO $pdo = null, $table = null, array $options = null)
-    {
-        if (null !== $pdo) {
-            $this->setPdo($pdo);
-        }
-
-        if (null !== $table) {
-            $this->setTable($table);
-        }
-
-        if (null !== $options) {
-            $this->setOptions($options);
-        }
-    }
-
-    /**
-     * Returns instance of database adapter
-     *
-     * @return PDO|null
-     *
-     * @since
-     */
-    public function getPdo()
-    {
-        return $this->pdo;
-    }
-
-    /**
-     * Sets PDO instance to be used
-     *
-     * @param PDO $pdo
-     * @return void
-     */
-    public function setPdo(PDO $pdo)
-    {
-        $driverName = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
-
-        if (!in_array($driverName, ['mysql', 'dblib', 'sqlite', 'oci'])) {
-            throw new Exception\RuntimeException('Driver not supported');
-        }
-
-        $this->pdo = $pdo;
-        $this->driverName = $driverName;
-    }
-
-    /**
-     * Returns table name used for executing queries
-     *
-     * @return string|null
-     */
-    public function getTable()
-    {
-        return $this->table;
-    }
-
-    /**
-     * Sets table name used for executing queries
-     *
-     * @param string $table
-     * @throws Exception\InvalidArgumentException
-     */
-    public function setTable($table)
-    {
-        $this->checkTable($table);
-        $this->table = $table;
-    }
-
-    /**
-     * Returns name of column used for identifiers of nodes
-     *
-     * @return string
-     */
-    public function getIdColumn()
-    {
-        return $this->idColumn;
-    }
-
-    /**
-     * Sets name of column used for identifiers of nodes
-     *
-     * @param string $name
-     * @throws Exception\InvalidArgumentException
-     */
-    public function setIdColumn($name)
-    {
-        if (!is_string($name)) {
-            throw new Exception\InvalidArgumentException(sprintf(
-                "Method expects a string as column name. Instance of %s given",
-                is_object($name) ? get_class($name) : gettype($name)
-            ));
-        }
-
-        if (empty($name)) {
-            throw new Exception\InvalidArgumentException('Column name can not be empty string');
-        }
-
-        $this->idColumn = $name;
-    }
-
-    /**
-     * Returns name of column used for left values of nodes
-     *
-     * @return string
-     */
-    public function getLeftColumn()
-    {
-        return $this->leftColumn;
-    }
-
-    /**
-     * Sets name of column used for left values of nodes
-     *
-     * @param string $name
-     * @throws Exception\InvalidArgumentException
-     */
-    public function setLeftColumn($name)
-    {
-        if (!is_string($name)) {
-            throw new Exception\InvalidArgumentException(sprintf(
-                "Method expects a string as column name. Instance of %s given",
-                is_object($name) ? get_class($name) : gettype($name)
-            ));
-        }
-
-        if (empty($name)) {
-            throw new Exception\InvalidArgumentException('Column name can not be empty string');
-        }
-
-        $this->leftColumn = $name;
-    }
-
-    /**
-     * Returns name of column used for right values of nodes
-     *
-     * @return string
-     */
-    public function getRightColumn()
-    {
-        return $this->rightColumn;
-    }
-
-    /**
-     * Sets name of column used for right values of nodes
-     *
-     * @param string $name
-     * @throws Exception\InvalidArgumentException
-     */
-    public function setRightColumn($name)
-    {
-        if (!is_string($name)) {
-            throw new Exception\InvalidArgumentException(sprintf(
-                "Method expects a string as column name. Instance of %s given",
-                is_object($name) ? get_class($name) : gettype($name)
-            ));
-        }
-
-        if (empty($name)) {
-            throw new Exception\InvalidArgumentException('Column name can not be empty string');
-        }
-
-        $this->rightColumn = $name;
-    }
-
-    /**
-     * Sets options defined in array
-     *
-     * @param array $options Array of options with following keys supported:
-     *                          pdo: PDO instance
-     *                          table: Table name used for executing queries
-     *                          id_column: Name of column used for identifiers of nodes
-     *                          left_column: Name of column used for left values of nodes
-     *                          right_column: Name of column used for right values of nodes
-     */
-    public function setOptions(array $options)
-    {
-        if (array_key_exists('pdo', $options) && null !== $options['db']) {
-            $this->setPdo($options['pdo']);
-        }
-
-        if (array_key_exists('table', $options) && null !== $options['table']) {
-            $this->setTable($options['table']);
-        }
-
-        if (array_key_exists('id_column', $options) && null !== $options['id_column']) {
-            $this->setIdColumn($options['id_column']);
-        }
-
-        if (array_key_exists('left_column', $options) && null !== $options['left_column']) {
-            $this->setLeftColumn($options['left_column']);
-        }
-
-        if (array_key_exists('right_column', $options) && null !== $options['right_column']) {
-            $this->setRightColumn($options['right_column']);
-        }
-    }
-
-    /**
-     * Checks if passed table name is valid
-     *
-     * @param $table
-     * @return bool
-     * @throws Exception\InvalidArgumentException
-     */
-    public function checkTable($table)
-    {
-        if (!is_string($table)) {
-            throw new Exception\InvalidArgumentException(sprintf(
-                "Method expects a string for table name. Instance of %s given",
-                is_object($table) ? get_class($table) : gettype($table)
-            ));
-        }
-
-        if (empty($table)) {
-            throw new Exception\InvalidArgumentException('Name of a table can not be a empty string');
-        }
-
-        return true;
-    }
-
-    /**
-     * Quotes column/table name
-     *
-     * @param $name
-     * @return string
-     */
-    public function quoteName($name)
-    {
-        switch ($this->driverName) {
-            case 'mysql':
-                $name = '`' . str_replace('`', '``', $name) . '`';
-                break;
-            case 'dblib': // MS SQL Server
-            case 'sqlite':
-                $name = '[' . str_replace(']', ']]', $name) . ']';
-                break;
-            case 'oci':
-                $name = '"' . str_replace('"', '""', $name) . '"';
-                break;
-            default:
-                throw new Exception\RuntimeException('No PDO instance is set');
-        }
-
-        return $name;
-    }
-
-    /**
-     * Quotes a value
-     *
-     * @param $value
-     * @return string
-     */
-    public function quoteValue($value)
-    {
-        switch ($value) {
-            case is_int($value):
-                $paramType = PDO::PARAM_INT;
-                break;
-            case is_bool($value):
-                $paramType = PDO::PARAM_BOOL;
-                break;
-            case is_null($value):
-                $paramType = PDO::PARAM_NULL;
-                break;
-            default:
-                $paramType = PDO::PARAM_STR;
-        }
-        return $this->pdo->quote($value, $paramType);
-    }
-
-    /**
-     * @param string $query
-     * @return \PDOStatement
-     * @throws Exception\RuntimeException
-     */
-    protected function prepareStatement($query)
-    {
-        $statement = $this->pdo->prepare($query);
-
-        if (false === $statement) {
-            throw new Exception\RuntimeException('Could not create SQL statement');
-        }
-
-        return $statement;
-    }
 
     /**
      * @param string $query
@@ -385,29 +50,6 @@ class NestedSet
     }
 
     /**
-     * @param string $query
-     * @return array
-     * @throws Exception\RuntimeException
-     */
-    protected function executeSelect($query)
-    {
-        $statement = $this->prepareStatement($query);
-        $execution = $statement->execute();
-
-        if (false === $execution) {
-            throw new Exception\RuntimeException('Could not execute select query');
-        }
-
-        $result = $statement->fetch(PDO::FETCH_ASSOC);
-
-        if (false === $result) {
-            throw new Exception\RuntimeException('Could not fetch data');
-        }
-
-        return $result;
-    }
-
-    /**
      * @param $query
      * @return int
      * @throws Exception\RuntimeException
@@ -432,14 +74,10 @@ class NestedSet
      */
     public function createRootNode($table = null)
     {
-        if (null !== $table) {
-            $this->checkTable($table);
-        } else {
-            $table = $this->getTable();
-        }
+        $table = $this->getTable($table);
 
         if (null === $table) {
-            throw new Exception\RuntimeException('No table was set globally or specified as argument');
+            throw new Exception\NoTableSetException();
         }
 
         $table = $this->quoteName($table);
@@ -464,20 +102,13 @@ class NestedSet
     public function insert(array $data, $parent, $table = null)
     {
         if (!is_int($parent)) {
-            throw new Exception\InvalidArgumentException(sprintf(
-                "Method expects integer as identifier of a parent node. Instance of %s given",
-                is_object($parent) ? get_class($parent) : gettype($parent)
-            ));
+            throw new Exception\InvalidNodeIdentifierException($parent, "Parent node");
         }
 
-        if (null !== $table) {
-            $this->checkTable($table);
-        } else {
-            $table = $this->getTable();
-        }
+        $table = $this->getTable($table);
 
         if (null === $table) {
-            throw new Exception\RuntimeException('No table was set globally or specified as argument');
+            throw new Exception\NoTableSetException();
         }
 
         $table = $this->quoteName($table);
@@ -540,17 +171,11 @@ class NestedSet
     public function move($source, $destination, $moveTo = self::MOVE_DEFAULT, $table = null)
     {
         if (!is_int($source)) {
-            throw new Exception\InvalidArgumentException(sprintf(
-                "Method expects integer as \$source parameter. Instance of %s given",
-                is_object($source) ? get_class($source) : gettype($source)
-            ));
+            throw new Exception\InvalidNodeIdentifierException($source, "Source node");
         }
 
         if (!is_int($destination)) {
-            throw new Exception\InvalidArgumentException(sprintf(
-                "Method expects integer as \$destination parameter. Instance of %s given",
-                is_object($destination) ? get_class($destination) : gettype($destination)
-            ));
+            throw new Exception\InvalidNodeIdentifierException($destination, "Destination node");
         }
 
         if (!is_string($moveTo)) {
@@ -567,14 +192,10 @@ class NestedSet
             ));
         }
 
-        if (null !== $table) {
-            $this->checkTable($table);
-        } else {
-            $table = $this->getTable();
-        }
+        $table = $this->getTable($table);
 
         if (null === $table) {
-            throw new Exception\RuntimeException('No table was set globally or specified as argument');
+            throw new Exception\NoTableSetException();
         }
 
         $table = $this->quoteName($table);
@@ -730,20 +351,13 @@ class NestedSet
     public function delete($id, $table = null)
     {
         if (!is_int($id)) {
-            throw new Exception\InvalidArgumentException(sprintf(
-                "Method expects integer as identifier. Instance of %s given",
-                is_object($id) ? get_class($id) : gettype($id)
-            ));
+            throw new Exception\InvalidNodeIdentifierException($id);
         }
 
-        if (null !== $table) {
-            $this->checkTable($table);
-        } else {
-            $table = $this->getTable();
-        }
+        $table = $this->getTable($table);
 
         if (null === $table) {
-            throw new Exception\RuntimeException('No table was set globally or specified as argument');
+            throw new Exception\NoTableSetException();
         }
 
         $table = $this->quoteName($table);

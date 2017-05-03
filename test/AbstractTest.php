@@ -2,7 +2,6 @@
 
 namespace metalinspired\NestedSetTest;
 
-use metalinspired\NestedSet\NestedSet;
 use \PDO;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\DbUnit\TestCaseTrait;
@@ -32,13 +31,6 @@ abstract class AbstractTest
      * @var Connection
      */
     protected $conn = null;
-
-    /**
-     * Instance of NestedSet
-     *
-     * @var NestedSet
-     */
-    static protected $nestedSet = null;
 
     /**
      * Syntax to create table in SQLite database
@@ -76,13 +68,10 @@ abstract class AbstractTest
         return $this->conn;
     }
 
-    final public static function setUpBeforeClass()
+    public static function setUpBeforeClass()
     {
         // create PDO object
         self::$pdo = new PDO($GLOBALS[self::DB_DSN], $GLOBALS[self::DB_USER], $GLOBALS[self::DB_PASSWORD]);
-
-        // create NestedSet object
-        self::$nestedSet = new NestedSet(self::$pdo, $GLOBALS[self::DB_TABLE]);
 
         switch (self::$pdo->getAttribute(PDO::ATTR_DRIVER_NAME)) {
             case 'mysql':
@@ -109,17 +98,9 @@ abstract class AbstractTest
         }
     }
 
-    final public static function tearDownAfterClass()
+    public static function tearDownAfterClass()
     {
         self::$pdo->exec('DROP TABLE IF EXISTS `' . $GLOBALS[self::DB_TABLE] . '`;');
         self::$pdo = null;
-    }
-
-    protected function getQueryTable()
-    {
-        return $this->getConnection()->createQueryTable(
-            $GLOBALS[self::DB_TABLE],
-            'SELECT * FROM `' . $GLOBALS[self::DB_TABLE] . '`;'
-        );
     }
 }

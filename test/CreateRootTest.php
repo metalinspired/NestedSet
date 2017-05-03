@@ -3,7 +3,7 @@
 namespace metalinspired\NestedSetTest;
 
 class CreateRootTest
-    extends AbstractTest
+    extends AbstractNestedSetTest
 {
     public function getDataSet()
     {
