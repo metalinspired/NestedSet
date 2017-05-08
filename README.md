@@ -2,8 +2,9 @@
 
 ## Introduction
 
-This library allows you to manipulate records in database using [Nested set model](https://en.wikipedia.org/wiki/Nested_set_model)
-Testes on MySQL, SQLite and MS SQL Server.
+This library allows you to manipulate records in database using [Nested set model](https://en.wikipedia.org/wiki/Nested_set_model).
+ 
+Tested on MySQL, SQLite and MS SQL Server.
 
 ## Requirements
 
