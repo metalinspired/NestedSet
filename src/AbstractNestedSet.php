@@ -298,7 +298,7 @@ abstract class AbstractNestedSet
                 $name = '"' . str_replace('"', '""', $name) . '"';
                 break;
             default:
-                throw new Exception\RuntimeException('No PDO instance is set');
+                throw new Exception\RuntimeException('No PDO instance is set or unsupported DB');
         }
 
         return $name;

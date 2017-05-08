@@ -3,6 +3,7 @@
 ## Introduction
 
 This library allows you to manipulate records in database using [Nested set model](https://en.wikipedia.org/wiki/Nested_set_model)
+Testes on MySQL, SQLite and MS SQL Server.
 
 ## Requirements
 
@@ -149,3 +150,10 @@ $nestedSet->findNextSibling()
 ```
 
 **Note: Please check methods description as I am to lazy to write all here :)**
+
+# TODO
+- [x] add support for SQLite
+- [x] add support for MS SQL Server
+- [ ] ability to choose which columns to fetch with find methods
+- [ ] ability to join on other tables with find methods
+- [ ] support for hybrid nested set

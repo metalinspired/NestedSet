@@ -41,6 +41,7 @@ class NestedSetSelect
 
     /**
      * Find immediate children of a node
+     * Proxies to findDescendants() with limit to return only first level of descendant nodes
      *
      * @param int $id Node identifier
      * @param string|null $table Table name
@@ -50,44 +51,21 @@ class NestedSetSelect
      */
     public function findChildren($id, $table = null, $fetchStyle = self::FETCH_DEFAULT, $includeParent = false)
     {
-        if (!is_int($id)) {
-            throw new Exception\InvalidNodeIdentifierException($id);
-        }
-
-        $table = $this->getTable($table);
-
-        if (null === $table) {
-            throw new Exception\NoTableSetException();
-        }
-
-        $table = $this->quoteName($table);
-        $idColumn = $this->quoteName($this->getIdColumn());
-        $leftColumn = $this->quoteName($this->getLeftColumn());
-        $rightColumn = $this->quoteName($this->getRightColumn());
-
-        $query = "SELECT child.* " .
-            "FROM {$table} AS parent " .
-            "JOIN (SELECT {$leftColumn} AS parentLft, {$rightColumn} AS parentRgt FROM {$table} WHERE {$idColumn} = {$id}) AS parent2 " .
-            "JOIN {$table} AS child ON child.{$leftColumn} BETWEEN parent.{$leftColumn} AND parent.{$rightColumn} " .
-            "WHERE parent.{$leftColumn} >= parentLft AND parent.{$rightColumn} < parentRgt AND parent.{$idColumn} > {$this->rootNodeId} " .
-            "GROUP BY child.{$idColumn} " .
-            "HAVING COUNT(child.{$idColumn}) " . ($includeParent ? '<' : '') . "= 1 " .
-            "ORDER BY child.{$leftColumn} ASC";
-
-        return $this->executeSelect($query, $fetchStyle, self::FETCH_MODE_ALL);
+        return $this->findDescendants($id, $table, $fetchStyle, $includeParent, 1);
     }
 
     /**
      * Finds descendants of a node.
-     * Adds a 'depth' column to each node
+     * If limit is not set or limit is greater than 1 adds a 'depth' column to each node
      *
      * @param int $id Node identifier
      * @param string|null $table Table name
      * @param int $fetchStyle PDO fetch style
      * @param bool $includeParent Set to true to include the node whose descendants are being searched for in result
+     * @param int|null $limit If set returns descendants deep as limit
      * @return array
      */
-    public function findDescendants($id, $table = null, $fetchStyle = self::FETCH_DEFAULT, $includeParent = false)
+    public function findDescendants($id, $table = null, $fetchStyle = self::FETCH_DEFAULT, $includeParent = false, $limit = null)
     {
         if (!is_int($id)) {
             throw new Exception\InvalidNodeIdentifierException($id);
@@ -99,20 +77,38 @@ class NestedSetSelect
             throw new Exception\NoTableSetException();
         }
 
+        if (null !== $limit && !is_int($limit)) {
+            throw new Exception\InvalidArgumentException(sprintf(
+                "Limit can be null or integer. Instance of %s given",
+                is_object($limit) ? get_class($limit) : gettype($limit)
+            ));
+        }
+
         $table = $this->quoteName($table);
         $idColumn = $this->quoteName($this->getIdColumn());
         $leftColumn = $this->quoteName($this->getLeftColumn());
         $rightColumn = $this->quoteName($this->getRightColumn());
 
-        $query = "SELECT child.* , COUNT(*) AS depth " .
-            "FROM {$table} AS parent " .
-            "JOIN (SELECT {$leftColumn} AS parentLft, {$rightColumn} AS parentRgt FROM {$table} WHERE {$idColumn} = {$id}) AS parent2 " .
-            "JOIN {$table} AS child ON child.{$leftColumn} BETWEEN parent.{$leftColumn} AND parent.{$rightColumn} " .
-            "WHERE parent.{$leftColumn} >" . ($includeParent ? '=' : '') . " parentLft " .
-            "AND parent.{$rightColumn} <" . ($includeParent ? '=' : '') . " parentRgt " .
-            " AND parent.{$idColumn} > {$this->rootNodeId} " .
-            "GROUP BY child.{$idColumn} " .
-            "ORDER BY child.{$leftColumn} ASC";
+        $query = "SELECT t.*" . (null === $limit || $limit > 1 ? ", q.depth AS depth " : " ") .
+            "FROM (" .
+            " SELECT child.{$idColumn}" . (null === $limit || $limit > 1 ? ", (CASE WHEN child.{$idColumn} = {$id} THEN 0 ELSE COUNT(*) END) AS depth" : "") .
+            " FROM {$table} AS head_parent" .
+            " JOIN {$table} AS parent ON (" .
+            "  parent.{$leftColumn} >= head_parent.{$leftColumn}" .
+            "  AND parent.{$rightColumn} < head_parent.{$rightColumn}" .
+            " ) " .
+            " JOIN {$table} AS child ON (" .
+            "  child.{$leftColumn} BETWEEN parent.{$leftColumn} AND parent.{$rightColumn}" .
+            " )" .
+            " WHERE head_parent.{$idColumn} = {$id}" .
+            "  AND parent.{$idColumn} > {$this->rootNodeId}" .
+            ($includeParent ? " OR child.{$idColumn} = {$id}" : "") .
+            " GROUP BY child.{$idColumn}" .
+            " HAVING count(*) >= 1" .
+            ($limit ? " AND count(*) <= {$limit}" : "") .
+            ") AS q " .
+            "JOIN {$table} AS t ON t.{$idColumn} = q.{$idColumn} " .
+            "ORDER BY t.{$leftColumn} ASC";
 
         return $this->executeSelect($query, $fetchStyle, self::FETCH_MODE_ALL);
     }
@@ -159,13 +155,8 @@ class NestedSetSelect
         $leftColumn = $this->quoteName($this->getLeftColumn());
         $rightColumn = $this->quoteName($this->getRightColumn());
 
-        $query = "SELECT node.* " .
-            "FROM {$table} AS node " .
-            "JOIN (SELECT {$leftColumn} AS parentLft, {$rightColumn} AS parentRgt FROM {$table} WHERE {$idColumn} = {$id}) AS parent " .
-            "WHERE node.{$leftColumn} <" . ($includeChild ? '=' : '') . " parentLft " .
-            "AND node.{$rightColumn} >" . ($includeChild ? '=' : '') . " parentRgt " .
-            "AND node.{$idColumn} > {$this->rootNodeId} " .
-            "ORDER BY node.{$leftColumn} DESC";
+        $sqlTop = "";
+        $sqlLimit = "";
 
         if (null !== $limit) {
             if (!is_int($limit)) {
@@ -174,8 +165,26 @@ class NestedSetSelect
                     is_object($id) ? get_class($id) : gettype($id)
                 ));
             }
-            $query .= " LIMIT {$limit}";
+            if ('dblib' === $this->pdo->getAttribute(\PDO::ATTR_DRIVER_NAME)) {
+                $sqlTop = "TOP {$limit}";
+            } else {
+                $sqlLimit = " LIMIT {$limit}";
+            }
         }
+
+        $query = "SELECT {$sqlTop} node.* " .
+            "FROM (" .
+            " SELECT {$leftColumn}, {$rightColumn}" .
+            " FROM {$table}" .
+            " WHERE {$idColumn} = {$id}" .
+            ") AS parent " .
+            "JOIN {$table} AS node ON (" .
+            " node.{$leftColumn} < parent.{$leftColumn}" .
+            " AND node.{$rightColumn} > parent.{$rightColumn}" .
+            " AND node.{$idColumn} > {$this->rootNodeId}" .
+            ") " .
+            "ORDER BY node.{$leftColumn} DESC" .
+            $sqlLimit;
 
         if ($limit === 1) {
             $fetchMode = self::FETCH_MODE_SINGLE;
@@ -212,28 +221,69 @@ class NestedSetSelect
         $leftColumn = $this->quoteName($this->getLeftColumn());
         $rightColumn = $this->quoteName($this->getRightColumn());
 
-        $query = "SELECT siblings.* " .
-            "FROM {$table} as parent " .
-            "JOIN (" .
-            " SELECT {$leftColumn} AS parentLft, {$rightColumn} AS parentRgt " .
-            " FROM {$table} AS parent " .
-            " JOIN (" .
-            "  SELECT {$leftColumn} AS nodeLft, {$rightColumn} as nodeRgt " .
-            "  FROM {$table} " .
-            "  WHERE {$idColumn} = {$id}" .
-            " ) AS node " .
-            " WHERE parent.lft < nodeLft AND parent.rgt > nodeRgt " .
-            " ORDER BY parent.lft DESC " .
-            " LIMIT 1 " .
-            ") AS node_parent " .
-            "JOIN {$table} AS siblings ON siblings.{$leftColumn} BETWEEN parent.{$leftColumn} AND parent.{$rightColumn} " .
-            "WHERE parent.{$leftColumn} > parentLft AND parent.{$rightColumn} < parentRgt " .
-            ($includeCurrent ? "" : "AND siblings.{$idColumn} <> {$id} ") .
-            "GROUP BY siblings.{$idColumn} " .
-            "HAVING COUNT(siblings.{$idColumn}) = 1 " .
-            "ORDER BY siblings.{$leftColumn} ASC";
+        $sqlTop = "";
+        $sqlLimit = "";
+
+        if ('dblib' === $this->pdo->getAttribute(\PDO::ATTR_DRIVER_NAME)) {
+            $sqlTop = "TOP 1";
+        } else {
+            $sqlLimit = " LIMIT 1";
+        }
+
+        $query = "SELECT t.* " .
+            "FROM (" .
+            " SELECT child.{$idColumn}" .
+            " FROM {$table} node" .
+            " JOIN {$table} AS head_parent ON head_parent.{$idColumn} = (" .
+            "  SELECT {$sqlTop} {$idColumn}" .
+            "  FROM {$table}" .
+            "  WHERE node.{$leftColumn} > {$leftColumn} AND node.{$rightColumn} < {$rightColumn}" .
+            "  ORDER BY {$table}.{$leftColumn} DESC" .
+            "  {$sqlLimit}" .
+            " )" .
+            " JOIN {$table} parent ON (parent.{$leftColumn} >= head_parent.{$leftColumn} AND parent.{$rightColumn} < head_parent.{$rightColumn})" .
+            " JOIN {$table} child ON (child.{$leftColumn} BETWEEN parent.{$leftColumn} AND parent.{$rightColumn})" .
+            " WHERE node.{$idColumn} = {$id}" . ($includeCurrent ? "" : " AND child.{$idColumn} <> {$id}") .
+            " GROUP BY child.{$idColumn}" .
+            " HAVING count(*) = 1" .
+            ") q " .
+            "JOIN {$table} t ON t.{$idColumn} = q.{$idColumn}" . "
+            ORDER BY t.{$leftColumn} ASC";
 
         return $this->executeSelect($query, $fetchStyle, NestedSet::FETCH_MODE_ALL);
+    }
+
+    /**
+     * Find next sibling of a node
+     * @param int $id Node identifier
+     * @param string|null $table Table name
+     * @param int $fetchStyle PDO fetch style
+     * @return mixed
+     */
+    public function findNextSibling($id, $table = null, $fetchStyle = self::FETCH_DEFAULT)
+    {
+        if (!is_int($id)) {
+            throw new Exception\InvalidNodeIdentifierException($id);
+        }
+
+        $table = $this->getTable($table);
+
+        if (null === $table) {
+            throw new Exception\NoTableSetException();
+        }
+
+        $table = $this->quoteName($table);
+        $idColumn = $this->quoteName($this->getIdColumn());
+        $leftColumn = $this->quoteName($this->getLeftColumn());
+        $rightColumn = $this->quoteName($this->getRightColumn());
+
+        $query = "SELECT sibling.* " .
+            "FROM {$table} AS sibling " .
+            "JOIN {$table} AS node ON node.{$idColumn} = {$id} " .
+            "WHERE sibling.{$leftColumn} = node.{$rightColumn} + 1 AND sibling.{$rightColumn} > node.{$rightColumn} " .
+            "ORDER BY {$leftColumn} ASC";
+
+        return $this->executeSelect($query, $fetchStyle);
     }
 
     /**
@@ -261,43 +311,10 @@ class NestedSetSelect
         $leftColumn = $this->quoteName($this->getLeftColumn());
         $rightColumn = $this->quoteName($this->getRightColumn());
 
-        $query = "SELECT siblings.* " .
-            "FROM {$table} AS siblings " .
-            "JOIN (SELECT {$leftColumn} as nodeLft FROM {$table} WHERE {$idColumn} = {$id}) AS node " .
-            "WHERE siblings.{$rightColumn} = nodeLft - 1 AND siblings.{$leftColumn} < nodeLft " .
-            "ORDER BY {$leftColumn} ASC";
-
-        return $this->executeSelect($query, $fetchStyle);
-    }
-
-    /**
-     * Find next sibling of a node
-     * @param int $id Node identifier
-     * @param string|null $table Table name
-     * @param int $fetchStyle PDO fetch style
-     * @return mixed
-     */
-    public function findNextSibling($id, $table = null, $fetchStyle = self::FETCH_DEFAULT)
-    {
-        if (!is_int($id)) {
-            throw new Exception\InvalidNodeIdentifierException($id);
-        }
-
-        $table = $this->getTable($table);
-
-        if (null === $table) {
-            throw new Exception\NoTableSetException();
-        }
-
-        $table = $this->quoteName($table);
-        $idColumn = $this->quoteName($this->getIdColumn());
-        $leftColumn = $this->quoteName($this->getLeftColumn());
-        $rightColumn = $this->quoteName($this->getRightColumn());
-
-        $query = "SELECT siblings.* " .
-            "FROM {$table} AS siblings " .
-            "JOIN (SELECT {$rightColumn} as nodeRgt FROM {$table} WHERE {$idColumn} = {$id}) AS node " .
-            "WHERE siblings.{$leftColumn} = nodeRgt + 1 AND siblings.{$rightColumn} > nodeRgt " .
+        $query = "SELECT sibling.* " .
+            "FROM {$table} AS sibling " .
+            "JOIN {$table} AS node ON node.{$idColumn} = {$id} " .
+            "WHERE sibling.{$rightColumn} = node.{$leftColumn} - 1 AND sibling.{$leftColumn} < node.{$leftColumn} " .
             "ORDER BY {$leftColumn} ASC";
 
         return $this->executeSelect($query, $fetchStyle);
@@ -329,8 +346,8 @@ class NestedSetSelect
 
         $query = "SELECT child.* " .
             "FROM {$table} AS child " .
-            "JOIN (SELECT {$leftColumn} AS nodeLft FROM {$table} WHERE {$idColumn} = {$id}) AS node " .
-            "WHERE child.{$leftColumn} = nodeLft + 1";
+            "JOIN {$table} AS node ON node.{$idColumn} = {$id} " .
+            "WHERE child.{$leftColumn} = node.{$leftColumn} + 1";
 
         return $this->executeSelect($query, $fetchStyle);
     }
@@ -361,8 +378,8 @@ class NestedSetSelect
 
         $query = "SELECT child.* " .
             "FROM {$table} AS child " .
-            "JOIN (SELECT {$rightColumn} AS nodeRgt FROM {$table} WHERE {$idColumn} = {$id}) AS node " .
-            "WHERE child.{$rightColumn} = nodeRgt - 1";
+            "JOIN {$table} AS node ON node.{$idColumn} = {$id} " .
+            "WHERE child.{$rightColumn} = node.{$rightColumn} - 1";
 
         return $this->executeSelect($query, $fetchStyle);
     }

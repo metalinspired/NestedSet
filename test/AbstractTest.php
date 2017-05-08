@@ -32,33 +32,6 @@ abstract class AbstractTest
      */
     protected $conn = null;
 
-    /**
-     * Syntax to create table in SQLite database
-     *
-     * @var string
-     */
-    static protected $sqliteTable = 'CREATE TABLE [#tableName#] ' .
-    '( ' .
-    '[id] INTEGER PRIMARY KEY AUTOINCREMENT, ' .
-    '[lft] INTEGER NOT NULL, ' .
-    '[rgt] INTEGER NOT NULL, ' .
-    '[value] TEXT DEFAULT \'\' NOT NULL ' .
-    ');';
-
-    /**
-     * Syntax to create table in MySQL database
-     *
-     * @var string
-     */
-    static protected $mysqlTable = 'CREATE TABLE `#tableName#` (' .
-    '`id` int(4) NOT NULL,' .
-    '`lft` int(4) NOT NULL,' .
-    '`rgt` int(4) NOT NULL,' .
-    '`value` varchar(100) COLLATE utf8_unicode_ci NOT NULL DEFAULT \'\'' .
-    ') ENGINE=MEMORY DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;' .
-    'ALTER TABLE `#tableName#` ADD PRIMARY KEY(`id`);' .
-    'ALTER TABLE `#tableName#` MODIFY `id` int(4) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT = 1;';
-
     final public function getConnection()
     {
         if (null === $this->conn) {
@@ -75,10 +48,25 @@ abstract class AbstractTest
 
         switch (self::$pdo->getAttribute(PDO::ATTR_DRIVER_NAME)) {
             case 'mysql':
-                $table = self::$mysqlTable;
+                $table = 'DROP TABLE IF EXISTS `#tableName#`;' .
+                    'CREATE TABLE `#tableName#` (' .
+                    '`id` int(4) NOT NULL,' .
+                    '`lft` int(4) NOT NULL,' .
+                    '`rgt` int(4) NOT NULL,' .
+                    '`value` varchar(100) COLLATE utf8_unicode_ci NOT NULL DEFAULT \'\'' .
+                    ') ENGINE=MEMORY DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;' .
+                    'ALTER TABLE `#tableName#` ADD PRIMARY KEY(`id`);' .
+                    'ALTER TABLE `#tableName#` MODIFY `id` int(4) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT = 1;';
                 break;
             case 'sqlite':
-                $table = self::$sqliteTable;
+                $table = 'DROP TABLE IF EXISTS [#tableName#];' .
+                    'CREATE TABLE [#tableName#] ' .
+                    '( ' .
+                    '[id] INTEGER PRIMARY KEY AUTOINCREMENT, ' .
+                    '[lft] INTEGER NOT NULL, ' .
+                    '[rgt] INTEGER NOT NULL, ' .
+                    '[value] TEXT DEFAULT \'\' NOT NULL ' .
+                    ');';
                 break;
             default:
                 throw new \RuntimeException('Unsupported database type');
@@ -87,10 +75,7 @@ abstract class AbstractTest
         // create DB table
         try {
             self::$pdo->beginTransaction();
-            self::$pdo->exec(
-                'DROP TABLE IF EXISTS `' . $GLOBALS[self::DB_TABLE] . '`;' .
-                str_replace('#tableName#', $GLOBALS[self::DB_TABLE], $table)
-            );
+            self::$pdo->exec(str_replace('#tableName#', $GLOBALS[self::DB_TABLE], $table));
             self::$pdo->commit();
         } catch (\PDOException $exception) {
             self::$pdo->rollBack();
@@ -99,8 +84,17 @@ abstract class AbstractTest
     }
 
     public static function tearDownAfterClass()
-    {
-        self::$pdo->exec('DROP TABLE IF EXISTS `' . $GLOBALS[self::DB_TABLE] . '`;');
+    {switch (self::$pdo->getAttribute(PDO::ATTR_DRIVER_NAME)) {
+        case 'mysql':
+            $table = 'DROP TABLE IF EXISTS `#tableName#`';
+            break;
+        case 'sqlite':
+            $table = 'DROP TABLE IF EXISTS [#tableName#];';
+            break;
+        default:
+            throw new \RuntimeException('Unsupported database type');
+    }
+        self::$pdo->exec(str_replace('#tableName#', $GLOBALS[self::DB_TABLE], $table));
         self::$pdo = null;
     }
 }
