@@ -1,6 +1,6 @@
 {
   "name": "metalinspired/nested-set",
-  "description": "PHP library for managing records in database represented as nested set",
+  "description": "PHP library for manipulating and retrieving database records using nested set model technique to represent tree data structure",
   "license": "BSD-3-Clause",
   "type": "library",
   "keywords": [

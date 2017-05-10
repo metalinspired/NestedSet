@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This library allows you to manipulate records in database using [Nested set model](https://en.wikipedia.org/wiki/Nested_set_model).
+This library allows you to manipulate and retrieve database records using [nested set model](https://en.wikipedia.org/wiki/Nested_set_model) technique to represent tree data structure.
  
 Tested on MySQL, SQLite and MS SQL Server.
 
@@ -155,6 +155,6 @@ $nestedSet->findNextSibling()
 # TODO
 - [x] add support for SQLite
 - [x] add support for MS SQL Server
-- [ ] ability to choose which columns to fetch with find methods
+- [x] ability to choose which columns to fetch with find methods
 - [ ] ability to join on other tables with find methods
 - [ ] support for hybrid nested set

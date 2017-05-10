@@ -74,17 +74,10 @@ class NestedSet
      */
     public function createRootNode($table = null)
     {
-        $table = $this->getTable($table);
-
-        if (null === $table) {
-            throw new Exception\NoTableSetException();
-        }
-
-        $table = $this->quoteName($table);
-        $leftColumn = $this->quoteName($this->getLeftColumn());
-        $rightColumn = $this->quoteName($this->getRightColumn());
-
-        $query = "INSERT INTO {$table} ({$leftColumn}, {$rightColumn}) VALUES (1, 2)";
+        $query = $this->buildQuery(
+            "INSERT INTO ::table:: (::leftColumn::, ::rightColumn::) VALUES (1, 2)",
+            $table
+        );
 
         return $this->executeInsert($query);
     }
@@ -105,21 +98,13 @@ class NestedSet
             throw new Exception\InvalidNodeIdentifierException($parent, "Parent node");
         }
 
-        $table = $this->getTable($table);
-
-        if (null === $table) {
-            throw new Exception\NoTableSetException();
-        }
-
-        $table = $this->quoteName($table);
-        $rightColumn = $this->quoteName($this->getRightColumn());
-        $leftColumn = $this->quoteName($this->getLeftColumn());
-        $idColumn = $this->quoteName($this->getIdColumn());
-
         /*
          * Get parents right column value as left column value for new node
          */
-        $query = "SELECT {$rightColumn} AS rgt FROM {$table} WHERE {$idColumn} = {$parent}";
+        $query = $this->buildQuery(
+            "SELECT ::rightColumn:: AS rgt FROM ::table:: WHERE ::idColumn:: = {$parent}",
+            $table
+        );
 
         $result = $this->executeSelect($query);
 
@@ -135,10 +120,13 @@ class NestedSet
         /*
          * Create a gap to insert new record
          */
-        $query = "UPDATE {$table} SET " .
-            "{$rightColumn} = {$rightColumn} + 2, " .
-            "{$leftColumn} = (CASE WHEN {$leftColumn} > {$newPosition} THEN {$leftColumn} + 2 ELSE {$leftColumn} END) " .
-            "WHERE {$rightColumn} >= {$newPosition}";
+        $query = $this->buildQuery(
+            "UPDATE ::table:: SET " .
+            "::rightColumn:: = ::rightColumn:: + 2, " .
+            "::leftColumn:: = (CASE WHEN ::leftColumn:: > {$newPosition} THEN ::leftColumn:: + 2 ELSE ::leftColumn:: END) " .
+            "WHERE ::rightColumn:: >= {$newPosition}",
+            $table
+        );
 
         $this->executeUpdate($query);
 
@@ -148,10 +136,13 @@ class NestedSet
         $data[$this->getLeftColumn()] = $newPosition;
         $data[$this->getRightColumn()] = $newPosition + 1;
 
-        $query = "INSERT INTO {$table} " .
+        $query = $this->buildQuery(
+            "INSERT INTO ::table:: " .
             "(" . implode(',', array_map([$this, 'quoteName'], array_keys($data))) . ") " .
             "VALUES " .
-            "(" . implode(',', array_map([$this, 'quoteValue'], $data)) . ")";
+            "(" . implode(',', array_map([$this, 'quoteValue'], $data)) . ")",
+            $table
+        );
 
         return $this->executeInsert($query);
     }
@@ -192,21 +183,13 @@ class NestedSet
             ));
         }
 
-        $table = $this->getTable($table);
-
-        if (null === $table) {
-            throw new Exception\NoTableSetException();
-        }
-
-        $table = $this->quoteName($table);
-        $leftColumn = $this->quoteName($this->getLeftColumn());
-        $rightColumn = $this->quoteName($this->getRightColumn());
-        $idColumn = $this->quoteName($this->getIdColumn());
-
         /*
          * Get left and right values of moving node
          */
-        $query = "SELECT {$leftColumn} AS lft, {$rightColumn} as rgt FROM {$table} WHERE {$idColumn} = {$source}";
+        $query = $this->buildQuery(
+            "SELECT ::leftColumn:: AS lft, ::rightColumn:: as rgt FROM ::table:: WHERE ::idColumn:: = {$source}",
+            $table
+        );
 
         $result = $this->executeSelect($query);
 
@@ -223,7 +206,10 @@ class NestedSet
         /*
          * Determine exact destination for moving node
          */
-        $query = "SELECT {$leftColumn} AS lft, {$rightColumn} AS rgt FROM {$table} WHERE {$idColumn} = $destination";
+        $query = $this->buildQuery(
+            "SELECT ::leftColumn:: AS lft, ::rightColumn:: AS rgt FROM ::table:: WHERE ::idColumn:: = $destination",
+            $table
+        );
 
         $result = $this->executeSelect($query);
 
@@ -266,30 +252,39 @@ class NestedSet
         /*
          * Create gap
          */
-        $query = "UPDATE {$table} SET " .
-            "{$leftColumn} = (CASE WHEN {$leftColumn} >= {$destination} THEN {$leftColumn} + {$size} ELSE {$leftColumn} END), " .
-            "{$rightColumn} = (CASE WHEN {$rightColumn} >= {$destination} THEN {$rightColumn} + {$size} ELSE {$rightColumn} END) " .
-            "WHERE {$rightColumn} >= {$destination}";
+        $query = $this->buildQuery(
+            "UPDATE ::table:: SET " .
+            "::leftColumn:: = (CASE WHEN ::leftColumn:: >= {$destination} THEN ::leftColumn:: + {$size} ELSE ::leftColumn:: END), " .
+            "::rightColumn:: = (CASE WHEN ::rightColumn:: >= {$destination} THEN ::rightColumn:: + {$size} ELSE ::rightColumn:: END) " .
+            "WHERE ::rightColumn:: >= {$destination}",
+            $table
+        );
 
         $this->executeUpdate($query);
 
         /*
          * Move node to its new position
          */
-        $query = "UPDATE {$table} SET " .
-            "{$leftColumn} = {$leftColumn} + {$distance}, " .
-            "{$rightColumn} = {$rightColumn} + {$distance} " .
-            "WHERE {$leftColumn} >= {$sourceLeft} AND {$rightColumn} < {$sourceLeft} + {$size}";
+        $query = $this->buildQuery(
+            "UPDATE ::table:: SET " .
+            "::leftColumn:: = ::leftColumn:: + {$distance}, " .
+            "::rightColumn:: = ::rightColumn:: + {$distance} " .
+            "WHERE ::leftColumn:: >= {$sourceLeft} AND ::rightColumn:: < {$sourceLeft} + {$size}",
+            $table
+        );
 
         $result = $this->executeUpdate($query);
 
         /*
          * Remove space gap created after node has been moved
          */
-        $query = "UPDATE {$table} SET " .
-            "{$leftColumn} = (CASE WHEN {$leftColumn} > {$sourceRight} THEN {$leftColumn} - {$size} ELSE {$leftColumn} END), " .
-            "{$rightColumn} = (CASE WHEN {$rightColumn} > {$sourceRight} THEN {$rightColumn} - {$size} ELSE {$rightColumn} END) " .
-            "WHERE {$rightColumn} > {$sourceRight}";
+        $query = $this->buildQuery(
+            "UPDATE ::table:: SET " .
+            "::leftColumn:: = (CASE WHEN ::leftColumn:: > {$sourceRight} THEN ::leftColumn:: - {$size} ELSE ::leftColumn:: END), " .
+            "::rightColumn:: = (CASE WHEN ::rightColumn:: > {$sourceRight} THEN ::rightColumn:: - {$size} ELSE ::rightColumn:: END) " .
+            "WHERE ::rightColumn:: > {$sourceRight}",
+            $table
+        );
 
         $this->executeUpdate($query);
 
@@ -354,21 +349,13 @@ class NestedSet
             throw new Exception\InvalidNodeIdentifierException($id);
         }
 
-        $table = $this->getTable($table);
-
-        if (null === $table) {
-            throw new Exception\NoTableSetException();
-        }
-
-        $table = $this->quoteName($table);
-        $leftColumn = $this->quoteName($this->getLeftColumn());
-        $rightColumn = $this->quoteName($this->getRightColumn());
-        $idColumn = $this->quoteName($this->getIdColumn());
-
         /*
          * Get right and left values of node that is being deleted
          */
-        $query = "SELECT {$leftColumn} AS lft, {$rightColumn} AS rgt FROM {$table} WHERE {$idColumn} = {$id}";
+        $query = $this->buildQuery(
+            "SELECT ::leftColumn:: AS lft, ::rightColumn:: AS rgt FROM ::table:: WHERE ::idColumn:: = {$id}",
+            $table
+        );
 
         $result = $this->executeSelect($query);
 
@@ -390,17 +377,23 @@ class NestedSet
         /*
          * Delete the node including its children
          */
-        $query = "DELETE FROM {$table} WHERE {$leftColumn} >= {$nodeLeft} AND {$rightColumn} <= {$nodeRight}";
+        $query = $this->buildQuery(
+            "DELETE FROM ::table:: WHERE ::leftColumn:: >= {$nodeLeft} AND ::rightColumn:: <= {$nodeRight}",
+            $table
+        );
 
         $result = $this->executeDelete($query);
 
         /*
          * Close the gap left after deleting
          */
-        $query = "UPDATE {$table} SET " .
-            "{$leftColumn} = (CASE WHEN {$leftColumn} > {$nodeRight} THEN {$leftColumn} - {$size} ELSE {$leftColumn} END), " .
-            "{$rightColumn} = (CASE WHEN {$rightColumn} > {$nodeRight} THEN {$rightColumn} - {$size} ELSE {$rightColumn} END) " .
-            "WHERE {$rightColumn} > {$nodeRight}";
+        $query = $this->buildQuery(
+            "UPDATE ::table:: SET " .
+            "::leftColumn:: = (CASE WHEN ::leftColumn:: > {$nodeRight} THEN ::leftColumn:: - {$size} ELSE ::leftColumn:: END), " .
+            "::rightColumn:: = (CASE WHEN ::rightColumn:: > {$nodeRight} THEN ::rightColumn:: - {$size} ELSE ::rightColumn:: END) " .
+            "WHERE ::rightColumn:: > {$nodeRight}",
+            $table
+        );
 
         $this->executeUpdate($query);
 

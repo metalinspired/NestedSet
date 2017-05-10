@@ -2,6 +2,8 @@
 
 namespace metalinspired\NestedSet;
 
+use metalinspired\NestedSet\Exception\InvalidArgumentException;
+use metalinspired\NestedSet\Exception\RuntimeException;
 use PDO;
 
 abstract class AbstractNestedSet
@@ -58,6 +60,13 @@ abstract class AbstractNestedSet
      * @var string
      */
     protected $rightColumn = 'rgt';
+
+    /**
+     * Cache for quoted column/table names
+     *
+     * @var array
+     */
+    protected static $namesCache = [];
 
     /**
      * NestedSet constructor
@@ -257,23 +266,23 @@ abstract class AbstractNestedSet
      */
     public function setOptions(array $options)
     {
-        if (array_key_exists('pdo', $options) && null !== $options['db']) {
+        if (array_key_exists('pdo', $options)) {
             $this->setPdo($options['pdo']);
         }
 
-        if (array_key_exists('table', $options) && null !== $options['table']) {
+        if (array_key_exists('table', $options)) {
             $this->setTable($options['table']);
         }
 
-        if (array_key_exists('id_column', $options) && null !== $options['id_column']) {
+        if (array_key_exists('id_column', $options)) {
             $this->setIdColumn($options['id_column']);
         }
 
-        if (array_key_exists('left_column', $options) && null !== $options['left_column']) {
+        if (array_key_exists('left_column', $options)) {
             $this->setLeftColumn($options['left_column']);
         }
 
-        if (array_key_exists('right_column', $options) && null !== $options['right_column']) {
+        if (array_key_exists('right_column', $options)) {
             $this->setRightColumn($options['right_column']);
         }
     }
@@ -281,27 +290,34 @@ abstract class AbstractNestedSet
     /**
      * Quotes column/table name
      *
-     * @param $name
+     * @param string $name
      * @return string
      */
     public function quoteName($name)
     {
+        // Check if name is cached
+        if (isset(self::$namesCache[$name]) && isset(self::$namesCache[$name][$this->driverName])) {
+            return self::$namesCache[$name][$this->driverName];
+        }
+
         switch ($this->driverName) {
             case 'mysql':
-                $name = '`' . str_replace('`', '``', $name) . '`';
+                $quotedName = '`' . str_replace('`', '``', $name) . '`';
                 break;
             case 'dblib': // MS SQL Server
             case 'sqlite':
-                $name = '[' . str_replace(']', ']]', $name) . ']';
+                $quotedName = '[' . str_replace(']', ']]', $name) . ']';
                 break;
             case 'oci':
-                $name = '"' . str_replace('"', '""', $name) . '"';
+                $quotedName = '"' . str_replace('"', '""', $name) . '"';
                 break;
             default:
                 throw new Exception\RuntimeException('No PDO instance is set or unsupported DB');
         }
 
-        return $name;
+        self::$namesCache[$name][$this->driverName] = $quotedName;
+
+        return $quotedName;
     }
 
     /**
@@ -375,9 +391,64 @@ abstract class AbstractNestedSet
         }
 
         if (false === $result) {
-            throw new Exception\RuntimeException('Could not fetch data');
+            return null;
         }
 
         return $result;
+    }
+
+    /**
+     * @param string $query Query string
+     * @param string|null $table Table name
+     * @param array $custom Array with custom replacements
+     * @return string
+     */
+    protected function buildQuery($query, $table, $custom = [])
+    {
+        $table = $this->getTable($table);
+
+        if (null === $table) {
+            throw new Exception\NoTableSetException();
+        }
+
+        if (!is_array($custom)) {
+            throw new InvalidArgumentException('Not an array');
+        }
+
+        $search = [
+            '::table::',
+            '::idColumn::',
+            '::leftColumn::',
+            '::rightColumn::'
+        ];
+
+        $replace = [
+            $this->quoteName($table),
+            $this->quoteName($this->getIdColumn()),
+            $this->quoteName($this->getLeftColumn()),
+            $this->quoteName($this->getRightColumn())
+        ];
+
+        if (!empty($custom)) {
+            foreach ($custom as $key => $value) {
+                if (!is_string($key) || 1 !== preg_match('/^::\w*::$/', $key)) {
+                    throw new RuntimeException('Invalid search value');
+                }
+                if (!is_string($value)) {
+                    throw new RuntimeException('Invalid replace value');
+                }
+                if (is_null($value)) {
+                    $custom[$key] = '';
+                }
+            }
+            if (!empty($custom)) {
+                $search = array_merge($search, array_keys($custom));
+                $replace = array_merge($replace, array_values($custom));
+            }
+        }
+
+        $query = str_replace($search, $replace, $query);
+
+        return $query;
     }
 }
