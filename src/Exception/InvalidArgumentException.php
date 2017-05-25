@@ -2,7 +2,6 @@
 
 namespace metalinspired\NestedSet\Exception;
 
-class InvalidArgumentException
-    extends \InvalidArgumentException
+class InvalidArgumentException extends \InvalidArgumentException
 {
 }

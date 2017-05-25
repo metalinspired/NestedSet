@@ -4,8 +4,7 @@ namespace metalinspired\NestedSet\Exception;
 
 use Throwable;
 
-class InvalidNodeIdentifierException
-    extends InvalidArgumentException
+class InvalidNodeIdentifierException extends InvalidArgumentException
 {
     public function __construct($nodeId, $nodeType = "Node", $message = "", $code = 0, Throwable $previous = null)
     {

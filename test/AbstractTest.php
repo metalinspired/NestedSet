@@ -2,13 +2,12 @@
 
 namespace metalinspired\NestedSetTest;
 
-use \PDO;
+use PDO;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\DbUnit\TestCaseTrait;
 use PHPUnit\DbUnit\Database\Connection;
 
-abstract class AbstractTest
-    extends TestCase
+abstract class AbstractTest extends TestCase
 {
     use TestCaseTrait;
 
@@ -84,16 +83,17 @@ abstract class AbstractTest
     }
 
     public static function tearDownAfterClass()
-    {switch (self::$pdo->getAttribute(PDO::ATTR_DRIVER_NAME)) {
-        case 'mysql':
-            $table = 'DROP TABLE IF EXISTS `#tableName#`';
-            break;
-        case 'sqlite':
-            $table = 'DROP TABLE IF EXISTS [#tableName#];';
-            break;
-        default:
-            throw new \RuntimeException('Unsupported database type');
-    }
+    {
+        switch (self::$pdo->getAttribute(PDO::ATTR_DRIVER_NAME)) {
+            case 'mysql':
+                $table = 'DROP TABLE IF EXISTS `#tableName#`';
+                break;
+            case 'sqlite':
+                $table = 'DROP TABLE IF EXISTS [#tableName#];';
+                break;
+            default:
+                throw new \RuntimeException('Unsupported database type');
+        }
         self::$pdo->exec(str_replace('#tableName#', $GLOBALS[self::DB_TABLE], $table));
         self::$pdo = null;
     }

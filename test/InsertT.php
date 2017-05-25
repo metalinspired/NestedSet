@@ -2,8 +2,8 @@
 
 namespace metalinspired\NestedSetTest;
 
-class InsertTest
-    extends AbstractNestedSetTest
+class InsertT
+    extends AbstractManipulateTest
 {
     public function getDataSet()
     {

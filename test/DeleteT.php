@@ -2,8 +2,8 @@
 
 namespace metalinspired\NestedSetTest;
 
-class DeleteTest
-    extends AbstractNestedSetTest
+class DeleteT
+    extends AbstractManipulateTest
 {
     public function getDataSet()
     {
