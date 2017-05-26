@@ -4,22 +4,23 @@ namespace metalinspired\NestedSetTest;
 
 use metalinspired\NestedSet\Config;
 use metalinspired\NestedSet\Exception\RuntimeException;
-use metalinspired\NestedSet\Manipulate\CreateRoot;
+use metalinspired\NestedSet\Manipulate;
 
-class CreateRootTest extends AbstractManipulateTest
+class CreateRootTest extends AbstractTest
 {
+    use GetQueryTableTrait;
     /**
-     * @var CreateRoot
+     * @var Manipulate
      */
-    protected $createRoot;
+    protected $manipulate;
 
     public function setUp()
     {
         parent::setUp();
 
         $config = Config::createWithPdo(self::$pdo);
-        $config->setTable($GLOBALS[self::DB_TABLE]);
-        $this->createRoot = new CreateRoot($config);
+        $config->table = $GLOBALS[self::DB_TABLE];
+        $this->manipulate = new Manipulate($config);
     }
 
     public function getDataSet()
@@ -27,21 +28,9 @@ class CreateRootTest extends AbstractManipulateTest
         return $this->createXMLDataSet(__DIR__ . '/Fixture/InitialState.xml');
     }
 
-    public function testUseObjectAsFunction()
-    {
-        ($this->createRoot)();
-
-        $this->assertTablesEqual(
-            $this
-                ->createMySQLXMLDataSet(__DIR__ . '/Fixture/CreateRoot.xml')
-                ->getTable($GLOBALS[self::DB_TABLE]),
-            $this->getQueryTable()
-        );
-    }
-
     public function testCreateRoot()
     {
-        $rootId = $this->createRoot->create();
+        $rootId = $this->manipulate->createRootNode();
 
         $this->assertEquals(1, $rootId);
 
@@ -57,6 +46,6 @@ class CreateRootTest extends AbstractManipulateTest
          */
         $this->expectException(RuntimeException::class);
 
-        $this->createRoot->create();
+        $this->manipulate->createRootNode();
     }
 }

@@ -3,7 +3,7 @@
 namespace metalinspired\NestedSetTest;
 
 class InsertT
-    extends AbstractManipulateTest
+    extends GetQueryTableTrait
 {
     public function getDataSet()
     {

@@ -6,6 +6,7 @@ use Zend\Db\Adapter\Adapter;
 use Zend\Db\Adapter\AdapterInterface;
 use Zend\Db\Adapter\Driver\DriverInterface;
 use Zend\Db\Adapter\Driver\Pdo\Pdo as ZendPdo;
+use Zend\Db\Sql\Join;
 use Zend\Db\Sql\Select;
 
 class Config
@@ -13,35 +14,35 @@ class Config
     /**
      * @var AdapterInterface
      */
-    protected $adapter = null;
+    public $adapter = null;
 
     /**
      * Name of a table used to execute queries
      *
      * @var string
      */
-    protected $table = null;
+    public $table = null;
 
     /**
      * Column name for identifiers of nodes
      *
      * @var string
      */
-    protected $idColumn = 'id';
+    public $idColumn = 'id';
 
     /**
      * Column name for left values of nodes
      *
      * @var string
      */
-    protected $leftColumn = 'lft';
+    public $leftColumn = 'lft';
 
     /**
      * Column name for right values of nodes
      *
      * @var string
      */
-    protected $rightColumn = 'rgt';
+    public $rightColumn = 'rgt';
 
     /**
      * Identifier of root node
@@ -49,204 +50,31 @@ class Config
      *
      * @var int
      */
-    protected $rootNodeId = 1;
+    public $rootNodeId = 1;
 
     /**
      * @var array
      */
-    protected $columns = [Select::SQL_STAR];
-
-    public function __construct(AdapterInterface $adapter = null)
-    {
-        if ($adapter) {
-            $this->adapter = $adapter;
-        }
-    }
+    public $columns = [Select::SQL_STAR];
 
     /**
-     * @return AdapterInterface
+     * @var bool
      */
-    public function getAdapter()
-    {
-        return $this->adapter;
-    }
+    public $includeSearchingNode = false;
 
     /**
-     * @param AdapterInterface $adapter
+     * @var Join
      */
-    public function setAdapter(AdapterInterface $adapter)
-    {
-        $this->adapter = $adapter;
-    }
+    public $joins = null;
 
     /**
-     * Returns table name used for executing queries
-     *
-     * @return string|null
+     * @var int
      */
-    public function getTable()
+    public $depthLimit = null;
+
+    public function __construct()
     {
-        return $this->table;
-    }
-
-    /**
-     * Sets table name used for executing queries
-     *
-     * @param string $table Table name
-     * @return $this Provides a fluent interface
-     * @throws Exception\InvalidArgumentException
-     */
-    public function setTable($table)
-    {
-        $this->table = $table;
-
-        return $this;
-    }
-
-    /**
-     * Returns name of column used for identifiers of nodes
-     *
-     * @return string
-     */
-    public function getIdColumn()
-    {
-        return $this->idColumn;
-    }
-
-    /**
-     * Sets name of column used for identifiers of nodes
-     *
-     * @param string $name Id column name
-     * @return $this Provides a fluent interface
-     * @throws Exception\InvalidArgumentException
-     */
-    public function setIdColumn($name)
-    {
-        if (!is_string($name)) {
-            throw new Exception\InvalidArgumentException(
-                sprintf(
-                    "Method expects a string as column name. Instance of %s given",
-                    is_object($name) ? get_class($name) : gettype($name)
-                )
-            );
-        }
-
-        if (empty($name)) {
-            throw new Exception\InvalidArgumentException('Column name can not be empty string');
-        }
-
-        $this->idColumn = $name;
-
-        return $this;
-    }
-
-    /**
-     * Returns name of column used for left values of nodes
-     *
-     * @return string
-     */
-    public function getLeftColumn()
-    {
-        return $this->leftColumn;
-    }
-
-    /**
-     * Sets name of column used for left values of nodes
-     *
-     * @param string $name
-     * @return $this Provides a fluent interface
-     * @throws Exception\InvalidArgumentException
-     */
-    public function setLeftColumn($name)
-    {
-        if (!is_string($name)) {
-            throw new Exception\InvalidArgumentException(sprintf(
-                "Method expects a string as column name. Instance of %s given",
-                is_object($name) ? get_class($name) : gettype($name)
-            ));
-        }
-
-        if (empty($name)) {
-            throw new Exception\InvalidArgumentException('Column name can not be empty string');
-        }
-
-        $this->leftColumn = $name;
-
-        return $this;
-    }
-
-    /**
-     * Returns name of column used for right values of nodes
-     *
-     * @return string
-     */
-    public function getRightColumn()
-    {
-        return $this->rightColumn;
-    }
-
-    /**
-     * Sets name of column used for right values of nodes
-     *
-     * @param string $name
-     * @return $this Provides a fluent interface
-     * @throws Exception\InvalidArgumentException
-     */
-    public function setRightColumn($name)
-    {
-        if (!is_string($name)) {
-            throw new Exception\InvalidArgumentException(sprintf(
-                "Method expects a string as column name. Instance of %s given",
-                is_object($name) ? get_class($name) : gettype($name)
-            ));
-        }
-
-        if (empty($name)) {
-            throw new Exception\InvalidArgumentException('Column name can not be empty string');
-        }
-
-        $this->rightColumn = $name;
-
-        return $this;
-    }
-
-    /**
-     * Returns identifier of root node
-     *
-     * @return int
-     */
-    public function getRootNodeId()
-    {
-        return $this->rootNodeId;
-    }
-
-    /**
-     * Sets identifier of root node
-     *
-     * @param int $id Root node identifier
-     *
-     * @return $this Provides a fluent interface
-     */
-    public function setRootNodeId($id)
-    {
-        if (!is_int($id)) {
-            throw new Exception\InvalidNodeIdentifierException($id);
-        }
-        $this->rootNodeId = $id;
-        return $this;
-    }
-
-    public function getColumns()
-    {
-        return $this->columns;
-    }
-
-    /**
-     * @param array $columns
-     */
-    public function setColumns(array $columns)
-    {
-        $this->columns = $columns;
+        $this->joins = new Join();
     }
 
     public static function createWithDsn($dsn, $username = null, $password = null)
@@ -264,6 +92,8 @@ class Config
     public static function createWithDriver(DriverInterface $driver)
     {
         $adapter = new Adapter($driver);
-        return new self($adapter);
+        $config = new self();
+        $config->adapter = $adapter;
+        return $config;
     }
 }

@@ -4,10 +4,7 @@ namespace metalinspired\NestedSetTest;
 
 abstract class AbstractFindTest extends AbstractTest
 {
-    protected static $customColumns = ['new_lft' => 'lft', 'rgt', 'text' => 'value'];
+    use GetDataSetTrait;
 
-    public function getDataSet()
-    {
-        return $this->createMySQLXMLDataSet(__DIR__ . '/Fixture/Insert.xml');
-    }
+    protected static $customColumns = ['new_lft' => 'lft', 'rgt', 'text' => 'value'];
 }

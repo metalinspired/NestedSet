@@ -2,10 +2,13 @@
 
 namespace metalinspired\NestedSetTest;
 
-abstract class AbstractManipulateTest extends AbstractTest
+use PHPUnit\DbUnit\TestCase;
+
+trait GetQueryTableTrait
 {
     protected function getQueryTable()
     {
+        /** @var AbstractTest $this */
         return $this->getConnection()->createQueryTable(
             $GLOBALS[self::DB_TABLE],
             'SELECT * FROM `' . $GLOBALS[self::DB_TABLE] . '`;'
