@@ -2,6 +2,8 @@
 
 namespace metalinspired\NestedSet;
 
+use metalinspired\NestedSet\Exception\InvalidArgumentException;
+use metalinspired\NestedSet\Exception\InvalidNodeIdentifierException;
 use Zend\Db\Adapter\Driver\ResultInterface;
 use Zend\Db\Adapter\Driver\StatementInterface;
 use Zend\Db\Sql\Expression;
@@ -13,11 +15,15 @@ use Zend\Db\Sql\Select;
 class Find extends AbstractNestedSet
 {
     /**
+     * Include searching node in results
+     *
      * @var bool
      */
     protected $includeSearchingNode = false;
 
     /**
+     * Columns to fetch
+     *
      * @var array
      */
     protected $columns = [Select::SQL_STAR];
@@ -28,10 +34,17 @@ class Find extends AbstractNestedSet
     protected $joins = [];
 
     /**
-     * @var int
+     * How deep results to return
+     *
+     * @var int|null
      */
     protected $depthLimit = null;
 
+    /**
+     * Find constructor
+     *
+     * @param Config $config Configuration object
+     */
     public function __construct(Config $config)
     {
         parent::__construct($config);
@@ -39,6 +52,8 @@ class Find extends AbstractNestedSet
     }
 
     /**
+     * Returns currently set behavior for including searching node in results
+     *
      * @return bool
      */
     public function getIncludeSearchingNode()
@@ -47,23 +62,34 @@ class Find extends AbstractNestedSet
     }
 
     /**
+     * Sets behavior for including searching node in results
+     *
      * @param bool $includeSearchingNode
      * @return $this Provides a fluent interface
      */
     public function setIncludeSearchingNode($includeSearchingNode)
     {
         $this->statements = [];
-        $this->includeSearchingNode = $includeSearchingNode;
+        $this->includeSearchingNode = (bool)$includeSearchingNode;
         return $this;
     }
 
+    /**
+     * Returns columns to fetch in results
+     *
+     * @return array
+     */
     public function getColumns()
     {
         return $this->columns;
     }
 
     /**
+     * Sets columns to fetch in results
+     *
+     * @see Select::columns() For explanation of possible states
      * @param array $columns
+     * @return $this Provides a fluent interface
      */
     public function setColumns(array $columns)
     {
@@ -72,6 +98,16 @@ class Find extends AbstractNestedSet
         return $this;
     }
 
+    /**
+     * Create a join clause
+     *
+     * @see Select::join()
+     * @param  string|array $name
+     * @param  string       $on
+     * @param  string|array $columns
+     * @param  string       $type one of the JOIN_* constants
+     * @return $this Provides a fluent interface
+     */
     public function join($name, $on, $columns = [Select::SQL_STAR], $type = Join::JOIN_INNER)
     {
         $this->statements = [];
@@ -79,6 +115,11 @@ class Find extends AbstractNestedSet
         return $this;
     }
 
+    /**
+     * Removes all join clauses
+     *
+     * @return $this Provides a fluent interface
+     */
     public function resetJoins()
     {
         $this->statements = [];
@@ -86,18 +127,40 @@ class Find extends AbstractNestedSet
         return $this;
     }
 
+    /**
+     * Returns currently set depth limit
+     *
+     * @return int|null
+     */
     public function getDepthLimit()
     {
         return $this->depthLimit;
     }
 
+    /**
+     * Sets how deep results to return
+     *
+     * @param int|null $depthLimit
+     * @return $this Provides a fluent interface
+     * @throws InvalidArgumentException
+     */
     public function setDepthLimit($depthLimit)
     {
+        if (!is_int($depthLimit) && null !== $depthLimit) {
+            throw new InvalidArgumentException();
+        }
+
         $this->statements = [];
         $this->depthLimit = $depthLimit;
         return $this;
     }
 
+    /**
+     * Builds a query that fetches ancestors
+     *
+     * @param null|int $depthLimit
+     * @return Select
+     */
     protected function getFindAncestorsQuery($depthLimit = null)
     {
         $subSelect = new Select($this->getTable());
@@ -165,6 +228,12 @@ class Find extends AbstractNestedSet
         return $select;
     }
 
+    /**
+     * Builds a query to fetch descendants
+     *
+     * @param null|int $depthLimit
+     * @return Select
+     */
     protected function getFindDescendantsQuery($depthLimit = null)
     {
         $subSelect = new Select(['head_parent' => $this->table]);
@@ -307,6 +376,12 @@ class Find extends AbstractNestedSet
         return $select;
     }
 
+    /**
+     * Builds a query to fetch first/last child
+     *
+     * @param bool $last
+     * @return Select
+     */
     protected function getFindChildQuery($last = false)
     {
         $select = new Select(['t' => $this->table]);
@@ -389,6 +464,11 @@ class Find extends AbstractNestedSet
         return $select;
     }
 
+    /**
+     * Builds a query to fetch siblings
+     *
+     * @return Select
+     */
     protected function getFindSiblingsQuery()
     {
         $subSelectSelect = new Select(['parent' => $this->table]);
@@ -551,6 +631,12 @@ class Find extends AbstractNestedSet
         return $select;
     }
 
+    /**
+     * Builds a query to fetch next/previous sibling
+     *
+     * @param bool $previous
+     * @return Select
+     */
     protected function getFindSiblingQuery($previous = false)
     {
         $select = new Select(['t' => $this->table]);
@@ -633,8 +719,19 @@ class Find extends AbstractNestedSet
         return $select;
     }
 
+    /**
+     * Finds ancestors of a node
+     *
+     * @param mixed $id Node identifier
+     * @return ResultInterface
+     * @throws InvalidNodeIdentifierException
+     */
     public function findAncestors($id)
     {
+        if (!is_int($id) && !is_string($id)) {
+            throw new Exception\InvalidNodeIdentifierException($id);
+        }
+
         if (!array_key_exists('find_ancestors', $this->statements)) {
             $this->statements['find_ancestors'] = $this->sql->prepareStatementForSqlObject(
                 $this->getFindAncestorsQuery()
@@ -649,8 +746,19 @@ class Find extends AbstractNestedSet
         return $statement->execute($parameters);
     }
 
+    /**
+     * Finds a parent (first ancestor) of a node
+     *
+     * @param mixed $id Node identifier
+     * @return ResultInterface
+     * @throws InvalidNodeIdentifierException
+     */
     public function findParent($id)
     {
+        if (!is_int($id) && !is_string($id)) {
+            throw new Exception\InvalidNodeIdentifierException($id);
+        }
+
         if (!array_key_exists('find_parent', $this->statements)) {
             $this->statements['find_parent'] = $this->sql->prepareStatementForSqlObject(
                 $this->getFindAncestorsQuery(1)
@@ -665,8 +773,19 @@ class Find extends AbstractNestedSet
         return $statement->execute($parameters);
     }
 
+    /**
+     * Find descendants of a node
+     *
+     * @param mixed $id Node identifier
+     * @return ResultInterface
+     * @throws InvalidNodeIdentifierException
+     */
     public function findDescendants($id)
     {
+        if (!is_int($id) && !is_string($id)) {
+            throw new Exception\InvalidNodeIdentifierException($id);
+        }
+
         if (!array_key_exists('find_descendants', $this->statements)) {
             $this->statements['find_descendants'] = $this->sql->prepareStatementForSqlObject(
                 $this->getFindDescendantsQuery()
@@ -688,8 +807,19 @@ class Find extends AbstractNestedSet
         return $statement->execute($parameters);
     }
 
+    /**
+     * Finds children (direct descendants) of a node
+     *
+     * @param mixed $id Node identifier
+     * @return ResultInterface
+     * @throws InvalidNodeIdentifierException
+     */
     public function findChildren($id)
     {
+        if (!is_int($id) && !is_string($id)) {
+            throw new Exception\InvalidNodeIdentifierException($id);
+        }
+
         if (!array_key_exists('find_children', $this->statements)) {
             $this->statements['find_children'] = $this->sql->prepareStatementForSqlObject(
                 $this->getFindDescendantsQuery(1)
@@ -711,8 +841,19 @@ class Find extends AbstractNestedSet
         return $statement->execute($parameters);
     }
 
+    /**
+     * Finds first child of a node
+     *
+     * @param mixed $id Node identifier
+     * @return ResultInterface
+     * @throws InvalidNodeIdentifierException
+     */
     public function findFirstChild($id)
     {
+        if (!is_int($id) && !is_string($id)) {
+            throw new Exception\InvalidNodeIdentifierException($id);
+        }
+
         if (!array_key_exists('find_first_child', $this->statements)) {
             $this->statements['find_first_child'] = $this->sql->prepareStatementForSqlObject(
                 $this->getFindChildQuery()
@@ -731,8 +872,19 @@ class Find extends AbstractNestedSet
         return $statement->execute($parameters);
     }
 
+    /**
+     * Finds last child of a node
+     *
+     * @param mixed $id Node identifier
+     * @return ResultInterface
+     * @throws InvalidNodeIdentifierException
+     */
     public function findLastChild($id)
     {
+        if (!is_int($id) && !is_string($id)) {
+            throw new Exception\InvalidNodeIdentifierException($id);
+        }
+
         if (!array_key_exists('find_last_child', $this->statements)) {
             $this->statements['find_last_child'] = $this->sql->prepareStatementForSqlObject(
                 $this->getFindChildQuery(true)
@@ -751,8 +903,19 @@ class Find extends AbstractNestedSet
         return $statement->execute($parameters);
     }
 
+    /**
+     * Finds sibling of a node
+     *
+     * @param mixed $id Node identifier
+     * @return ResultInterface
+     * @throws InvalidNodeIdentifierException
+     */
     public function findSiblings($id)
     {
+        if (!is_int($id) && !is_string($id)) {
+            throw new Exception\InvalidNodeIdentifierException($id);
+        }
+
         if (!array_key_exists('find_siblings', $this->statements)) {
             $this->statements['find_siblings'] = $this->sql->prepareStatementForSqlObject(
                 $this->getFindSiblingsQuery()
@@ -771,8 +934,19 @@ class Find extends AbstractNestedSet
         return $statement->execute($parameters);
     }
 
+    /**
+     * Finds next sibling of a node
+     *
+     * @param mixed $id Node identifier
+     * @return ResultInterface
+     * @throws InvalidNodeIdentifierException
+     */
     public function findNextSibling($id)
     {
+        if (!is_int($id) && !is_string($id)) {
+            throw new Exception\InvalidNodeIdentifierException($id);
+        }
+
         if (!array_key_exists('find_next_sibling', $this->statements)) {
             $this->statements['find_next_sibling'] = $this->sql->prepareStatementForSqlObject(
                 $this->getFindSiblingQuery()
@@ -791,8 +965,19 @@ class Find extends AbstractNestedSet
         return $statement->execute($parameters);
     }
 
+    /**
+     * Finds previous sibling of a node
+     *
+     * @param mixed $id Node identifier
+     * @return ResultInterface
+     * @throws InvalidNodeIdentifierException
+     */
     public function findPreviousSibling($id)
     {
+        if (!is_int($id) && !is_string($id)) {
+            throw new Exception\InvalidNodeIdentifierException($id);
+        }
+
         if (!array_key_exists('find_previous_sibling', $this->statements)) {
             $this->statements['find_previous_sibling'] = $this->sql->prepareStatementForSqlObject(
                 $this->getFindSiblingQuery(true)

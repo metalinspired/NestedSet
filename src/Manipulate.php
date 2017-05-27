@@ -14,7 +14,7 @@ use Zend\Db\Sql\Update;
 class Manipulate extends AbstractNestedSet
 {
     // TODO: implement method for moving all nodes children
-    
+
     /**
      * Constants for move method
      */
@@ -24,6 +24,14 @@ class Manipulate extends AbstractNestedSet
         MOVE_DEFAULT = self::MOVE_AFTER;
 
     /**
+     * Creates a statement for closing gap
+     * Statement has following placeholders:
+     *  :source1
+     *  :size1
+     *  :source2
+     *  :size2
+     *  :source3
+     *
      * @return StatementInterface
      */
     protected function getCloseGapStatement()
@@ -68,6 +76,10 @@ class Manipulate extends AbstractNestedSet
     }
 
     /**
+     * Creates a statement for getting left and right values of a node
+     * Statement has following placeholders:
+     *  :id
+     *
      * @return StatementInterface
      */
     protected function getGetLeftRightStatement()
@@ -97,10 +109,8 @@ class Manipulate extends AbstractNestedSet
      *
      * @param int $sourceLeft  Source node left value
      * @param int $sourceRight Source node right value
-     * @param int $destination Destination (left or right) for source node
+     * @param int $destination Destination for source node
      * @return int Number of rows affected (Nodes moved)
-     * @throws Exception\InvalidArgumentException
-     * @throws Exception\RuntimeException
      */
     protected function moveRange($sourceLeft, $sourceRight, $destination)
     {
@@ -122,7 +132,10 @@ class Manipulate extends AbstractNestedSet
             $sourceLeft += $size;
         }
 
-        if (!array_key_exists('create_gap', $this->statements)) {
+        /*
+         * Create gap
+         */
+        if (!array_key_exists('create_gap__move', $this->statements)) {
             $createGapStatement = new Update($this->table);
 
             $createGapStatement
@@ -155,15 +168,12 @@ class Manipulate extends AbstractNestedSet
                     new Expression(':destination3')
                 );
 
-            $this->statements['create_gap'] = $this->sql->prepareStatementForSqlObject($createGapStatement);
+            $this->statements['create_gap__move'] = $this->sql->prepareStatementForSqlObject($createGapStatement);
         }
 
         /** @var StatementInterface $createGapStatement */
-        $createGapStatement = $this->statements['create_gap'];
+        $createGapStatement = $this->statements['create_gap__move'];
 
-        /*
-         * Create gap
-         */
         $createGapStatement->execute([
             ':destination1' => $destination,
             ':size1' => $size,
@@ -172,6 +182,9 @@ class Manipulate extends AbstractNestedSet
             ':destination3' => $destination
         ]);
 
+        /*
+         * Move node to its new position
+         */
         if (!array_key_exists('move', $this->statements)) {
             $moveStatement = new Update($this->table);
 
@@ -216,9 +229,6 @@ class Manipulate extends AbstractNestedSet
         /** @var StatementInterface $moveStatement */
         $moveStatement = $this->statements['move'];
 
-        /*
-         * Move node to its new position
-         */
         $result = $moveStatement->execute([
             ':distance1' => $distance,
             ':distance2' => $distance,
@@ -239,6 +249,96 @@ class Manipulate extends AbstractNestedSet
         ]);
 
         return $result->getAffectedRows();
+    }
+
+    /**
+     * Inserts new node with provided data
+     *
+     * @param int|string $parent Identifier of parent node
+     * @param array      $data   Data for new node
+     * @return mixed|null Identifier for newly created node
+     * @throws Exception\InvalidNodeIdentifierException
+     * @throws Exception\RuntimeException
+     */
+    public function insert($parent, array $data = [])
+    {
+        if (!is_int($parent) && !is_string($parent)) {
+            throw new Exception\InvalidNodeIdentifierException($parent, 'Parent');
+        }
+
+        /*
+         * Get parents right column value as left column value for new node
+         */
+        $result = $this->getGetLeftRightStatement()->execute([':id' => $parent]);
+
+        if (0 === $result->getAffectedRows()) {
+            throw new Exception\RuntimeException(sprintf(
+                "Parent with identifier %s was not found or not unique",
+                $parent
+            ));
+        }
+        $newPosition = (int)$result->current()['rgt'];
+
+        /*
+         * Create a gap to insert new record
+         */
+        if (!array_key_exists('create_gap__insert', $this->statements)) {
+            $createGap = new Update($this->table);
+
+            $createGap
+                ->set([
+                    $this->rightColumn => new Expression(
+                        '? + 2',
+                        [
+                            [$this->rightColumn => Expression::TYPE_IDENTIFIER]
+                        ]
+                    ),
+                    $this->leftColumn => new Expression(
+                        '(CASE WHEN ? > :newPosition THEN ? + 2 ELSE ? END)',
+                        [
+                            [$this->leftColumn => Expression::TYPE_IDENTIFIER],
+                            [$this->leftColumn => Expression::TYPE_IDENTIFIER],
+                            [$this->leftColumn => Expression::TYPE_IDENTIFIER]
+                        ]
+                    )
+                ])
+                ->where
+                ->greaterThanOrEqualTo(
+                    new Expression(
+                        '?',
+                        [
+                            [$this->rightColumn => Expression::TYPE_IDENTIFIER]
+                        ]
+                    ),
+                    new Expression(':newPositionWhere')
+                );
+
+            $this->statements['create_gap__insert'] = $this->sql->prepareStatementForSqlObject($createGap);
+        }
+
+        /** @var StatementInterface $createGap */
+        $createGap = $this->statements['create_gap__insert'];
+
+        $createGap->execute([
+            ':newPosition' => $newPosition,
+            ':newPositionWhere' => $newPosition
+        ]);
+
+        /*
+         * Insert new data
+         */
+        $data[$this->leftColumn] = $newPosition;
+        $data[$this->rightColumn] = $newPosition + 1;
+
+        //if (!array_key_exists('insert', $this->statements)) {
+        $insert = new Insert($this->table);
+
+        $insert->values($data);
+        //}
+
+        $result = $this->sql->prepareStatementForSqlObject($insert)->execute();
+
+        return $result->getGeneratedValue();
     }
 
     /**
@@ -282,14 +382,22 @@ class Manipulate extends AbstractNestedSet
 
         return $result->getGeneratedValue();
     }
-    
+
+    /**
+     * Moves a node
+     *
+     * @param int|string $source      Identifier of source node
+     * @param int|string $destination Identifier of destination node
+     * @param string     $position    Move node to before/after destination or make it a child of destination node
+     * @return int Number of affected rows (Nodes moved)
+     */
     public function move($source, $destination, $position = self::MOVE_DEFAULT)
     {
-        if (!is_int($source)) {
+        if (!is_int($source) && !is_string($source)) {
             throw new Exception\InvalidNodeIdentifierException($source, 'Source node');
         }
 
-        if (!is_int($destination)) {
+        if (!is_int($destination) && !is_string($destination)) {
             throw new Exception\InvalidNodeIdentifierException($destination, 'Destination node');
         }
 
@@ -356,24 +464,56 @@ class Manipulate extends AbstractNestedSet
         return $this->moveRange($sourceLeft, $sourceRight, $destination);
     }
 
+    /**
+     * Move a node after destination node
+     *
+     * @see move()
+     * @param $source
+     * @param $destination
+     * @return int
+     */
     public function after($source, $destination)
     {
         return $this->move($source, $destination, self::MOVE_AFTER);
     }
 
+    /**
+     * Move a node before destination node
+     *
+     * @see move()
+     * @param $source
+     * @param $destination
+     * @return int
+     */
     public function before($source, $destination)
     {
         return $this->move($source, $destination, self::MOVE_BEFORE);
     }
 
+    /**
+     * Move a node to become a child of destination node
+     *
+     * @see move()
+     * @param $source
+     * @param $destination
+     * @return int
+     */
     public function makeChild($source, $destination)
     {
         return $this->move($source, $destination, self::MOVE_MAKE_CHILD);
     }
 
+    /**
+     * Deletes a node
+     *
+     * @param int|string $id Node identifier
+     * @return int number of rows affected (Nodes deleted)
+     * @throws Exception\InvalidNodeIdentifierException
+     * @throws Exception\RuntimeException
+     */
     public function delete($id)
     {
-        if (!is_int($id)) {
+        if (!is_int($id) && !is_string($id)) {
             throw new Exception\InvalidNodeIdentifierException($id);
         }
 

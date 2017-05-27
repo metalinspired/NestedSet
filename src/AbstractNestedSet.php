@@ -2,21 +2,25 @@
 
 namespace metalinspired\NestedSet;
 
+use metalinspired\NestedSet\Exception\InvalidArgumentException;
 use Zend\Db\Adapter\AdapterInterface;
-use Zend\Db\Sql\Select;
 use Zend\Db\Sql\Sql;
 
 abstract class AbstractNestedSet
 {
     /**
+     * Database adapter instance
+     *
      * @var AdapterInterface
      */
     protected $adapter = null;
 
     /**
      * Name of a table used to execute queries
+     * Can be a string or one element array
+     * where key represents alias and value actual table name
      *
-     * @var string
+     * @var string|array
      */
     protected $table = null;
 
@@ -45,7 +49,7 @@ abstract class AbstractNestedSet
      * Identifier of root node
      * This is used to omit root node from results
      *
-     * @var int
+     * @var int|string
      */
     protected $rootNodeId = 1;
 
@@ -67,6 +71,8 @@ abstract class AbstractNestedSet
     }
 
     /**
+     * Returns currently set database adapter instance
+     *
      * @return AdapterInterface
      */
     public function getAdapter()
@@ -75,7 +81,10 @@ abstract class AbstractNestedSet
     }
 
     /**
+     * Sets database adapter instance
+     *
      * @param AdapterInterface $adapter
+     * @return $this Provides a fluent interface
      */
     public function setAdapter(AdapterInterface $adapter)
     {
@@ -97,12 +106,16 @@ abstract class AbstractNestedSet
     /**
      * Sets table name used for executing queries
      *
-     * @param string $table Table name
+     * @param string|array $table Table name
      * @return $this Provides a fluent interface
      * @throws Exception\InvalidArgumentException
      */
     public function setTable($table)
     {
+        if (!is_string($table) && !is_array($table)) {
+            throw new InvalidArgumentException();
+        }
+
         $this->statements = [];
         $this->table = $table;
         return $this;
@@ -127,17 +140,8 @@ abstract class AbstractNestedSet
      */
     public function setIdColumn($name)
     {
-        if (!is_string($name)) {
-            throw new Exception\InvalidArgumentException(
-                sprintf(
-                    "Method expects a string as column name. Instance of %s given",
-                    is_object($name) ? get_class($name) : gettype($name)
-                )
-            );
-        }
-
-        if (empty($name)) {
-            throw new Exception\InvalidArgumentException('Column name can not be empty string');
+        if (!is_string($name) || empty($name)) {
+            throw new Exception\InvalidArgumentException("Invalid column name");
         }
 
         $this->statements = [];
@@ -165,15 +169,8 @@ abstract class AbstractNestedSet
      */
     public function setLeftColumn($name)
     {
-        if (!is_string($name)) {
-            throw new Exception\InvalidArgumentException(sprintf(
-                "Method expects a string as column name. Instance of %s given",
-                is_object($name) ? get_class($name) : gettype($name)
-            ));
-        }
-
-        if (empty($name)) {
-            throw new Exception\InvalidArgumentException('Column name can not be empty string');
+        if (!is_string($name) || empty($name)) {
+            throw new Exception\InvalidArgumentException("Invalid column name");
         }
 
         $this->statements = [];
@@ -201,15 +198,8 @@ abstract class AbstractNestedSet
      */
     public function setRightColumn($name)
     {
-        if (!is_string($name)) {
-            throw new Exception\InvalidArgumentException(sprintf(
-                "Method expects a string as column name. Instance of %s given",
-                is_object($name) ? get_class($name) : gettype($name)
-            ));
-        }
-
-        if (empty($name)) {
-            throw new Exception\InvalidArgumentException('Column name can not be empty string');
+        if (!is_string($name) || empty($name)) {
+            throw new Exception\InvalidArgumentException("Invalid column name");
         }
 
         $this->statements = [];
@@ -221,7 +211,7 @@ abstract class AbstractNestedSet
     /**
      * Returns identifier of root node
      *
-     * @return int
+     * @return int|string
      */
     public function getRootNodeId()
     {
@@ -231,13 +221,12 @@ abstract class AbstractNestedSet
     /**
      * Sets identifier of root node
      *
-     * @param int $id Root node identifier
-     *
+     * @param int|string $id Root node identifier
      * @return $this Provides a fluent interface
      */
     public function setRootNodeId($id)
     {
-        if (!is_int($id)) {
+        if (!is_int($id) && !is_string($id) || empty($id)) {
             throw new Exception\InvalidNodeIdentifierException($id);
         }
 
@@ -247,7 +236,13 @@ abstract class AbstractNestedSet
         return $this;
     }
 
-    protected function loadConfig(Config $config)
+    /**
+     * Loads configuration
+     *
+     * @param Config $config
+     * @return $this Provides a fluent interface
+     */
+    public function loadConfig(Config $config)
     {
         $this->statements = [];
 

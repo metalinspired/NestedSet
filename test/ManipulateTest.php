@@ -82,11 +82,10 @@ class ManipulateTest extends AbstractTest
         $this->assertEquals( 12, $rows);
     }
 
-    /**
-     * @expectedException \metalinspired\NestedSet\Exception\RuntimeException
-     */
     public function testDeleteNonExistingNode()
     {
+        $this->expectException(RuntimeException::class);
+
         $this->manipulate->delete(100);
     }
 }
