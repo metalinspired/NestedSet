@@ -349,8 +349,6 @@ class Manipulate extends AbstractNestedSet
      */
     public function createRootNode()
     {
-        //TODO: change rootNodeId to value generated once root node is created
-
         $select = new Select($this->table);
 
         $select->columns([

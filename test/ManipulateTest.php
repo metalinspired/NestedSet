@@ -26,7 +26,7 @@ class ManipulateTest extends AbstractTest
 
     public function testMoveNodeAfter()
     {
-        $rows = $this->manipulate->after(3, 14);
+        $rows = $this->manipulate->moveAfter(3, 14);
 
         $this->assertTablesEqual(
             $this
@@ -41,7 +41,7 @@ class ManipulateTest extends AbstractTest
     public function testMoveNodeBefore()
     {
 
-        $rows = $this->manipulate->before(20, 4);
+        $rows = $this->manipulate->moveBefore(20, 4);
 
         $this->assertTablesEqual(
             $this
@@ -56,7 +56,7 @@ class ManipulateTest extends AbstractTest
     public function testMoveNodeMakeChild()
     {
 
-        $rows = $this->manipulate->makeChild(20, 9);
+        $rows = $this->manipulate->moveMakeChild(20, 9);
 
         $this->assertTablesEqual(
             $this
