@@ -349,6 +349,8 @@ class Manipulate extends AbstractNestedSet
      */
     public function createRootNode()
     {
+        //TODO: change rootNodeId to value generated once root node is created
+
         $select = new Select($this->table);
 
         $select->columns([
@@ -472,7 +474,7 @@ class Manipulate extends AbstractNestedSet
      * @param $destination
      * @return int
      */
-    public function after($source, $destination)
+    public function moveAfter($source, $destination)
     {
         return $this->move($source, $destination, self::MOVE_AFTER);
     }
@@ -485,7 +487,7 @@ class Manipulate extends AbstractNestedSet
      * @param $destination
      * @return int
      */
-    public function before($source, $destination)
+    public function moveBefore($source, $destination)
     {
         return $this->move($source, $destination, self::MOVE_BEFORE);
     }
@@ -498,7 +500,7 @@ class Manipulate extends AbstractNestedSet
      * @param $destination
      * @return int
      */
-    public function makeChild($source, $destination)
+    public function moveMakeChild($source, $destination)
     {
         return $this->move($source, $destination, self::MOVE_MAKE_CHILD);
     }
