@@ -45,7 +45,7 @@ class Find extends AbstractNestedSet
      *
      * @param Config $config Configuration object
      */
-    public function __construct(Config $config)
+    public function __construct(Config $config = null)
     {
         parent::__construct($config);
         $this->joins = new Join();
@@ -167,31 +167,26 @@ class Find extends AbstractNestedSet
 
         $subSelect
             ->columns([
-                $this->leftColumn,
-                $this->rightColumn
+                'lft' => $this->leftColumn,
+                'rgt' => $this->rightColumn
             ], false)
             ->where
             ->equalTo($this->idColumn, new Expression(':id'));
 
         $select = new Select(['q' => $subSelect]);
 
-        $joinOn = '?.? <' . ($this->includeSearchingNode ? '=' : '') . ' ?.?' .
-            ' AND ?.? >' . ($this->includeSearchingNode ? '=' : '') . ' ?.?' .
-            ' AND ?.? > ?';
+        $joinOn = '? <' . ($this->includeSearchingNode ? '=' : '') . ' ?' .
+            ' AND ? >' . ($this->includeSearchingNode ? '=' : '') . ' ?' .
+            ' AND ? > ?';
 
         $joinOn = new Expression(
             $joinOn,
             [
-                ['t' => Expression::TYPE_IDENTIFIER],
-                [$this->leftColumn => Expression::TYPE_IDENTIFIER],
-                ['q' => Expression::TYPE_IDENTIFIER],
-                [$this->leftColumn => Expression::TYPE_IDENTIFIER],
-                ['t' => Expression::TYPE_IDENTIFIER],
-                [$this->rightColumn => Expression::TYPE_IDENTIFIER],
-                ['q' => Expression::TYPE_IDENTIFIER],
-                [$this->rightColumn => Expression::TYPE_IDENTIFIER],
-                ['t' => Expression::TYPE_IDENTIFIER],
-                [$this->idColumn => Expression::TYPE_IDENTIFIER],
+                ["t.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER],
+                ['q.lft' => Expression::TYPE_IDENTIFIER],
+                ["t.{$this->rightColumn}" => Expression::TYPE_IDENTIFIER],
+                ['q.rgt' => Expression::TYPE_IDENTIFIER],
+                ["t.{$this->idColumn}" => Expression::TYPE_IDENTIFIER],
                 $this->rootNodeId
             ]
         );
@@ -205,10 +200,9 @@ class Find extends AbstractNestedSet
             )
             ->order(
                 new Expression(
-                    '?.? DESC',
+                    '? DESC',
                     [
-                        ['t' => Expression::TYPE_IDENTIFIER],
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER]
+                        ["t.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 )
             );
@@ -243,16 +237,12 @@ class Find extends AbstractNestedSet
             ->join(
                 ['parent' => $this->table],
                 new Expression(
-                    '?.? >= ?.? AND ?.? < ?.?',
+                    '? >= ? AND ? < ?',
                     [
-                        ['parent' => Expression::TYPE_IDENTIFIER],
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER],
-                        ['head_parent' => Expression::TYPE_IDENTIFIER],
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER],
-                        ['parent' => Expression::TYPE_IDENTIFIER],
-                        [$this->rightColumn => Expression::TYPE_IDENTIFIER],
-                        ['head_parent' => Expression::TYPE_IDENTIFIER],
-                        [$this->rightColumn => Expression::TYPE_IDENTIFIER]
+                        ["parent.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER],
+                        ["head_parent.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER],
+                        ["parent.{$this->rightColumn}" => Expression::TYPE_IDENTIFIER],
+                        ["head_parent.{$this->rightColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 ),
                 []
@@ -260,39 +250,33 @@ class Find extends AbstractNestedSet
             ->join(
                 ['child' => $this->table],
                 new Expression(
-                    '?.? BETWEEN ?.? AND ?.?',
+                    '? BETWEEN ? AND ?',
                     [
-                        ['child' => Expression::TYPE_IDENTIFIER],
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER],
-                        ['parent' => Expression::TYPE_IDENTIFIER],
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER],
-                        ['parent' => Expression::TYPE_IDENTIFIER],
-                        [$this->rightColumn => Expression::TYPE_IDENTIFIER]
+                        ["child.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER],
+                        ["parent.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER],
+                        ["parent.{$this->rightColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 ),
                 [
                     'id' => new Expression(
-                        '?.?',
+                        '?',
                         [
-                            ['child' => Expression::TYPE_IDENTIFIER],
-                            [$this->idColumn => Expression::TYPE_IDENTIFIER]
+                            ["child.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
                         ]
                     ),
                     'depth' => new Expression(
-                        '(CASE WHEN ?.? = :childDepthId THEN 0 ELSE COUNT(*) END)',
+                        '(CASE WHEN ? = :childDepthId THEN 0 ELSE COUNT(*) END)',
                         [
-                            ['child' => Expression::TYPE_IDENTIFIER],
-                            [$this->idColumn => Expression::TYPE_IDENTIFIER]
+                            ["child.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
                         ]
                     )
                 ]
             )
             ->group(
                 new Expression(
-                    '?.?',
+                    '?',
                     [
-                        ['child' => Expression::TYPE_IDENTIFIER],
-                        [$this->idColumn => Expression::TYPE_IDENTIFIER]
+                        ["child.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 )
             );
@@ -309,20 +293,18 @@ class Find extends AbstractNestedSet
         $subSelect->where
             ->equalTo(
                 new Expression(
-                    '?.?',
+                    '?',
                     [
-                        ['head_parent' => Expression::TYPE_IDENTIFIER],
-                        [$this->idColumn => Expression::TYPE_IDENTIFIER]
+                        ["head_parent.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 ),
                 new Expression(':id')
             )
             ->greaterThan(
                 new Expression(
-                    '?.?',
+                    '?',
                     [
-                        ['parent' => Expression::TYPE_IDENTIFIER],
-                        [$this->idColumn => Expression::TYPE_IDENTIFIER]
+                        ["parent.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 ),
                 $this->rootNodeId
@@ -334,10 +316,9 @@ class Find extends AbstractNestedSet
                 ->or
                 ->equalTo(
                     new Expression(
-                        '?.?',
+                        '?',
                         [
-                            ['child' => Expression::TYPE_IDENTIFIER],
-                            [$this->idColumn => Expression::TYPE_IDENTIFIER]
+                            ["child.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
                         ]
                     ),
                     new Expression(':searchNodeId'));
@@ -350,21 +331,18 @@ class Find extends AbstractNestedSet
             ->join(
                 ['t' => $this->table],
                 new Expression(
-                    '?.? = ?.?',
+                    '? = ?',
                     [
-                        ['t' => Expression::TYPE_IDENTIFIER],
-                        [$this->idColumn => Expression::TYPE_IDENTIFIER],
-                        ['q' => Expression::TYPE_IDENTIFIER],
-                        [$this->idColumn => Expression::TYPE_IDENTIFIER]
+                        ["t.{$this->idColumn}" => Expression::TYPE_IDENTIFIER],
+                        ["q.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 ),
                 $this->columns
             )
             ->order(new Expression(
-                    '?.? ASC',
+                    '? ASC',
                     [
-                        ['t' => Expression::TYPE_IDENTIFIER],
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER]
+                        ["t.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 )
             );
@@ -391,30 +369,27 @@ class Find extends AbstractNestedSet
             ->join(
                 ['q' => $this->table],
                 new Expression(
-                    '?.? = :id',
+                    '? = :id',
                     [
-                        ['q' => Expression::TYPE_IDENTIFIER],
-                        [$this->idColumn => Expression::TYPE_IDENTIFIER]
+                        ["q.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 ),
                 []
             )
             ->order(
                 new Expression(
-                    '?.?',
+                    '?',
                     [
-                        ['q' => Expression::TYPE_IDENTIFIER],
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER]
+                        ["q.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 )
             )
             ->where
             ->greaterThan(
                 new Expression(
-                    '?.?',
+                    '?',
                     [
-                        ['t' => Expression::TYPE_IDENTIFIER],
-                        [$this->idColumn => Expression::TYPE_IDENTIFIER]
+                        ["t.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 ),
                 $this->rootNodeId
@@ -426,17 +401,15 @@ class Find extends AbstractNestedSet
 
         $predicate->equalTo(
             new Expression(
-                '?.?',
+                '?',
                 [
-                    ['t' => Expression::TYPE_IDENTIFIER],
-                    [$column => Expression::TYPE_IDENTIFIER]
+                    ["t.{$column}" => Expression::TYPE_IDENTIFIER]
                 ]
             ),
             new Expression(
-                '?.?' . ($last ? '-' : '+') . '1',
+                '?' . ($last ? '-' : '+') . '1',
                 [
-                    ['q' => Expression::TYPE_IDENTIFIER],
-                    [$column => Expression::TYPE_IDENTIFIER]
+                    ["q.{$column}" => Expression::TYPE_IDENTIFIER]
                 ]
             )
         );
@@ -446,10 +419,9 @@ class Find extends AbstractNestedSet
                 ->or
                 ->equalTo(
                     new Expression(
-                        '?.?',
+                        '?',
                         [
-                            ['t' => Expression::TYPE_IDENTIFIER],
-                            [$this->idColumn => Expression::TYPE_IDENTIFIER]
+                            ["t.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
                         ]
                     ),
                     new Expression(':includeId')
@@ -481,20 +453,18 @@ class Find extends AbstractNestedSet
             ->join(
                 ['node' => $this->table],
                 new Expression(
-                    '?.? = :id',
+                    '? = :id',
                     [
-                        ['node' => Expression::TYPE_IDENTIFIER],
-                        [$this->idColumn => Expression::TYPE_IDENTIFIER]
+                        ["node.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 ),
                 []
             )
             ->order(
                 new Expression(
-                    '?.? DESC',
+                    '? DESC',
                     [
-                        ['parent' => Expression::TYPE_IDENTIFIER],
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER]
+                        ["parent.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 )
             )
@@ -502,33 +472,29 @@ class Find extends AbstractNestedSet
             ->where
             ->greaterThan(
                 new Expression(
-                    '?.?',
+                    '?',
                     [
-                        ['node' => Expression::TYPE_IDENTIFIER],
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER]
+                        ["node.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 ),
                 new Expression(
-                    '?.?',
+                    '?',
                     [
-                        ['parent' => Expression::TYPE_IDENTIFIER],
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER]
+                        ["parent.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 )
             )
             ->lessThan(
                 new Expression(
-                    '?.?',
+                    '?',
                     [
-                        ['node' => Expression::TYPE_IDENTIFIER],
-                        [$this->rightColumn => Expression::TYPE_IDENTIFIER]
+                        ["node.{$this->rightColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 ),
                 new Expression(
-                    '?.?',
+                    '?',
                     [
-                        ['parent' => Expression::TYPE_IDENTIFIER],
-                        [$this->rightColumn => Expression::TYPE_IDENTIFIER]
+                        ["parent.{$this->rightColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 )
             );
@@ -540,16 +506,12 @@ class Find extends AbstractNestedSet
             ->join(
                 ['parent' => $this->table],
                 new Expression(
-                    '?.? >= ?.? AND ?.? < ?.?',
+                    '? >= ? AND ? < ?',
                     [
-                        ['parent' => Expression::TYPE_IDENTIFIER],
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER],
-                        ['head_parent' => Expression::TYPE_IDENTIFIER],
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER],
-                        ['parent' => Expression::TYPE_IDENTIFIER],
-                        [$this->rightColumn => Expression::TYPE_IDENTIFIER],
-                        ['head_parent' => Expression::TYPE_IDENTIFIER],
-                        [$this->rightColumn => Expression::TYPE_IDENTIFIER]
+                        ["parent.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER],
+                        ["head_parent.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER],
+                        ["parent.{$this->rightColumn}" => Expression::TYPE_IDENTIFIER],
+                        ["head_parent.{$this->rightColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 ),
                 []
@@ -557,24 +519,20 @@ class Find extends AbstractNestedSet
             ->join(
                 ['child' => $this->table],
                 new Expression(
-                    '?.? Between ?.? AND ?.?',
+                    '? BETWEEN ? AND ?',
                     [
-                        ['child' => Expression::TYPE_IDENTIFIER],
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER],
-                        ['parent' => Expression::TYPE_IDENTIFIER],
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER],
-                        ['parent' => Expression::TYPE_IDENTIFIER],
-                        [$this->rightColumn => Expression::TYPE_IDENTIFIER]
+                        ["child.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER],
+                        ["parent.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER],
+                        ["parent.{$this->rightColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 ),
                 [$this->idColumn]
             )
             ->group(
                 new Expression(
-                    '?.?',
+                    '?',
                     [
-                        ['child' => Expression::TYPE_IDENTIFIER],
-                        [$this->idColumn => Expression::TYPE_IDENTIFIER]
+                        ["child.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 )
             );
@@ -591,10 +549,9 @@ class Find extends AbstractNestedSet
                 ->where
                 ->notEqualTo(
                     new Expression(
-                        '?.?',
+                        '?',
                         [
-                            ['child' => Expression::TYPE_IDENTIFIER],
-                            [$this->idColumn => Expression::TYPE_IDENTIFIER]
+                            ["child.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
                         ]
                     ),
                     new Expression(':childId')
@@ -608,22 +565,19 @@ class Find extends AbstractNestedSet
             ->join(
                 ['t' => $this->table],
                 new Expression(
-                    '?.? = ?.?',
+                    '? = ?',
                     [
-                        ['t' => Expression::TYPE_IDENTIFIER],
-                        [$this->idColumn => Expression::TYPE_IDENTIFIER],
-                        ['q' => Expression::TYPE_IDENTIFIER],
-                        [$this->idColumn => Expression::TYPE_IDENTIFIER]
+                        ["t.{$this->idColumn}" => Expression::TYPE_IDENTIFIER],
+                        ["q.{$this->idColumn}" => Expression::TYPE_IDENTIFIER],
                     ]
                 ),
                 $this->columns
             )
             ->order(
                 new Expression(
-                    '?.? ASC',
+                    '? ASC',
                     [
-                        ['t' => Expression::TYPE_IDENTIFIER],
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER]
+                        ["t.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 )
             );
@@ -646,30 +600,27 @@ class Find extends AbstractNestedSet
             ->join(
                 ['q' => $this->table],
                 new Expression(
-                    '?.? = :id',
+                    '? = :id',
                     [
-                        ['q' => Expression::TYPE_IDENTIFIER],
-                        [$this->idColumn => Expression::TYPE_IDENTIFIER]
+                        ["q.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 ),
                 []
             )
             ->order(
                 new Expression(
-                    '?.? ' . ($previous ? 'DESC' : 'ASC'),
+                    '? ' . ($previous ? 'DESC' : 'ASC'),
                     [
-                        ['t' => Expression::TYPE_IDENTIFIER],
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER]
+                        ["t.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 )
             )
             ->where
             ->greaterThan(
                 new Expression(
-                    '?.?',
+                    '?',
                     [
-                        ['t' => Expression::TYPE_IDENTIFIER],
-                        [$this->idColumn => Expression::TYPE_IDENTIFIER]
+                        ["t.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 ),
                 $this->rootNodeId
@@ -682,17 +633,15 @@ class Find extends AbstractNestedSet
 
         $predicate->equalTo(
             new Expression(
-                '?.?',
+                '?',
                 [
-                    ['t' => Expression::TYPE_IDENTIFIER],
-                    [$column1 => Expression::TYPE_IDENTIFIER]
+                    ["t.{$column1}" => Expression::TYPE_IDENTIFIER]
                 ]
             ),
             new Expression(
-                '?.? ' . ($previous ? '-' : '+') . ' 1',
+                '? ' . ($previous ? '-' : '+') . ' 1',
                 [
-                    ['q' => Expression::TYPE_IDENTIFIER],
-                    [$column2 => Expression::TYPE_IDENTIFIER]
+                    ["q.{$column2}" => Expression::TYPE_IDENTIFIER]
                 ]
             )
         );
@@ -702,10 +651,9 @@ class Find extends AbstractNestedSet
                 ->or
                 ->equalTo(
                     new Expression(
-                        '?.?',
+                        '?',
                         [
-                            ['t' => Expression::TYPE_IDENTIFIER],
-                            [$this->idColumn => Expression::TYPE_IDENTIFIER]
+                            ["t.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
                         ]
                     ),
                     new Expression(':includeId')

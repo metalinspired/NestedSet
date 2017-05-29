@@ -61,8 +61,11 @@ $node2 = $manipulate->insert($node, ['column1' => 'child data', 'column2' => 'so
  
 // Move node2 so it is on same level as node1
 $manipulate->moveAfter($node2, $node1);
-// We could achieve the same like this
-$manipulate->moveMakeChild($node2, $rootId);
+// Or we could have moved it in front of node1
+$manipulate->moveBefore($node2, $node1);
+ 
+// Move node2 back to its original position (as child of node1)
+$manipulate->moveMakeChild($node2, $root1);
  
 // Delete a node (and all its children, if any)
 $manipulate->delete($node);

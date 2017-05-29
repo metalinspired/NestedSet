@@ -65,9 +65,11 @@ abstract class AbstractNestedSet
      */
     protected $sql = null;
 
-    public function __construct(Config $config)
+    public function __construct(Config $config = null)
     {
-        $this->loadConfig($config);
+        if ($config) {
+            $this->loadConfig($config);
+        }
     }
 
     /**
