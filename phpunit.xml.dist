@@ -9,7 +9,7 @@
         <var name="DB_USER" value=""/>
         <var name="DB_PASSWORD" value=""/>
         <var name="DB_NAME" value="test"/>
-        <var name="DB_TABLE" value="zend-nested-set"/>
+        <var name="DB_TABLE" value="nested-set"/>
     </php>
 
     <testsuites>

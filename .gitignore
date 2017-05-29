@@ -1,7 +1,6 @@
 .idea/
 vendor/
 build/
-sqlite/
 composer.lock
 *.phar
 phpunit.xml
