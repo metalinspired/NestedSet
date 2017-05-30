@@ -20,8 +20,7 @@ class Manipulate extends AbstractNestedSet
      */
     const MOVE_AFTER = 'after',
         MOVE_BEFORE = 'before',
-        MOVE_MAKE_CHILD = 'make_child',
-        MOVE_DEFAULT = self::MOVE_AFTER;
+        MOVE_MAKE_CHILD = 'make_child';
 
     /**
      * Creates a statement for closing gap
@@ -391,7 +390,7 @@ class Manipulate extends AbstractNestedSet
      * @param string     $position    Move node to before/after destination or make it a child of destination node
      * @return int Number of affected rows (Nodes moved)
      */
-    public function move($source, $destination, $position = self::MOVE_DEFAULT)
+    public function move($source, $destination, $position = self::MOVE_AFTER)
     {
         if (!is_int($source) && !is_string($source)) {
             throw new Exception\InvalidNodeIdentifierException($source, 'Source node');
@@ -446,7 +445,7 @@ class Manipulate extends AbstractNestedSet
         if ($result->getAffectedRows() !== 1) {
             throw new Exception\RuntimeException(sprintf(
                 'Destination node with identifier %s was not found or not unique',
-                $source
+                $destination
             ));
         }
 
@@ -522,7 +521,7 @@ class Manipulate extends AbstractNestedSet
          */
         $result = $this->getGetLeftRightStatement()->execute([':id' => $id]);
 
-        if (0 === $result->getAffectedRows()) {
+        if (1 !== $result->getAffectedRows()) {
             throw new Exception\RuntimeException(sprintf(
                 "Node with identifier: %s was not found or not unique",
                 $id
@@ -577,5 +576,56 @@ class Manipulate extends AbstractNestedSet
         ]);
 
         return $result->getAffectedRows();
+    }
+
+    public function clean($parent, $destination, $position = self::MOVE_MAKE_CHILD)
+    {
+        // TODO: Since this and move method are 98% identical maybe move destination and position to moveRange
+        if (!is_int($parent) && !is_string($parent)) {
+            throw new Exception\InvalidNodeIdentifierException($parent);
+        }
+        if (!is_int($destination) && !is_string($destination)) {
+            throw new Exception\InvalidNodeIdentifierException($destination);
+        }
+
+        /*
+         * Get left and right value of parent node
+         */
+        $result = $this->getGetLeftRightStatement()->execute([':id' => $parent]);
+
+        if (1 !== $result->getAffectedRows()) {
+            throw new Exception\RuntimeException(sprintf(
+                "Parent node with identifier: %s was not found or not unique",
+                $parent
+            ));
+        }
+
+        $rangeLeft = (int)$result->current()['lft'] + 1;
+        $rangeRight = (int)$result->current()['rgt'] - 1;
+
+        /*
+         * Get destination
+         */
+        $result = $this->getGetLeftRightStatement()->execute([':id' => $destination]);
+
+        if (1 !== $result->getAffectedRows()) {
+            throw new Exception\RuntimeException(sprintf(
+                'Destination node with identifier %s was not found or not unique',
+                $destination
+            ));
+        }
+
+        switch ($position) {
+            case self::MOVE_AFTER:
+                $destination = (int)$result->current()['rgt'] + 1;
+                break;
+            case self::MOVE_BEFORE:
+                $destination = (int)$result->current()['lft'];
+                break;
+            case self::MOVE_MAKE_CHILD:
+                $destination = (int)$result->current()['rgt'];
+        }
+
+        return $this->moveRange($rangeLeft, $rangeRight, $destination);
     }
 }

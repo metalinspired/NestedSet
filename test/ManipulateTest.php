@@ -28,14 +28,14 @@ class ManipulateTest extends AbstractTest
     {
         $rows = $this->manipulate->moveAfter(3, 14);
 
+        $this->assertEquals(12, $rows);
+
         $this->assertTablesEqual(
             $this
                 ->createMySQLXMLDataSet(__DIR__ . '/Fixture/MoveNodeBehind.xml')
                 ->getTable($GLOBALS[self::DB_TABLE]),
             $this->getQueryTable()
         );
-
-        $this->assertEquals(12, $rows);
     }
 
     public function testMoveNodeBefore()
@@ -43,14 +43,14 @@ class ManipulateTest extends AbstractTest
 
         $rows = $this->manipulate->moveBefore(20, 4);
 
+        $this->assertEquals(1, $rows);
+
         $this->assertTablesEqual(
             $this
                 ->createMySQLXMLDataSet(__DIR__ . '/Fixture/MoveNodeBefore.xml')
                 ->getTable($GLOBALS[self::DB_TABLE]),
             $this->getQueryTable()
         );
-
-        $this->assertEquals(1, $rows);
     }
 
     public function testMoveNodeMakeChild()
@@ -58,19 +58,21 @@ class ManipulateTest extends AbstractTest
 
         $rows = $this->manipulate->moveMakeChild(20, 9);
 
+        $this->assertEquals(1, $rows);
+
         $this->assertTablesEqual(
             $this
                 ->createMySQLXMLDataSet(__DIR__ . '/Fixture/MoveNodeChild.xml')
                 ->getTable($GLOBALS[self::DB_TABLE]),
             $this->getQueryTable()
         );
-
-        $this->assertEquals(1, $rows);
     }
 
     public function testDelete()
     {
         $rows = $this->manipulate->delete(3);
+
+        $this->assertEquals( 12, $rows);
 
         $this->assertTablesEqual(
             $this
@@ -78,8 +80,6 @@ class ManipulateTest extends AbstractTest
                 ->getTable($GLOBALS[self::DB_TABLE]),
             $this->getQueryTable()
         );
-
-        $this->assertEquals( 12, $rows);
     }
 
     public function testDeleteNonExistingNode()
@@ -87,5 +87,19 @@ class ManipulateTest extends AbstractTest
         $this->expectException(RuntimeException::class);
 
         $this->manipulate->delete(100);
+    }
+
+    public function testClean()
+    {
+        $rows = $this->manipulate->clean(3, 4);
+
+        $this->assertEquals(11, $rows);
+
+        $this->assertTablesEqual(
+            $this
+                ->createMySQLXMLDataSet(__DIR__ . '/Fixture/Clean.xml')
+                ->getTable($GLOBALS[self::DB_TABLE]),
+            $this->getQueryTable()
+        );
     }
 }

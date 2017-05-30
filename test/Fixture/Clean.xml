@@ -1,0 +1,223 @@
+<?xml version="1.0"?>
+<mysqldump xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <database name="test">
+        <table_data name="nested-set">
+            <row>
+                <field name="id">1</field>
+                <field name="lft">1</field>
+                <field name="rgt">72</field>
+                <field name="value"></field>
+            </row>
+            <row>
+                <field name="id">2</field>
+                <field name="lft">2</field>
+                <field name="rgt">5</field>
+                <field name="value">Node 0</field>
+            </row>
+            <row>
+                <field name="id">3</field>
+                <field name="lft">6</field>
+                <field name="rgt">7</field>
+                <field name="value">Node 1</field>
+            </row>
+            <row>
+                <field name="id">4</field>
+                <field name="lft">8</field>
+                <field name="rgt">33</field>
+                <field name="value">Node 2</field>
+            </row>
+            <row>
+                <field name="id">5</field>
+                <field name="lft">34</field>
+                <field name="rgt">37</field>
+                <field name="value">Node 3</field>
+            </row>
+            <row>
+                <field name="id">6</field>
+                <field name="lft">38</field>
+                <field name="rgt">51</field>
+                <field name="value">Node 4</field>
+            </row>
+            <row>
+                <field name="id">7</field>
+                <field name="lft">52</field>
+                <field name="rgt">55</field>
+                <field name="value">Node 5</field>
+            </row>
+            <row>
+                <field name="id">8</field>
+                <field name="lft">56</field>
+                <field name="rgt">59</field>
+                <field name="value">Node 6</field>
+            </row>
+            <row>
+                <field name="id">9</field>
+                <field name="lft">60</field>
+                <field name="rgt">63</field>
+                <field name="value">Node 7</field>
+            </row>
+            <row>
+                <field name="id">10</field>
+                <field name="lft">64</field>
+                <field name="rgt">67</field>
+                <field name="value">Node 8</field>
+            </row>
+            <row>
+                <field name="id">11</field>
+                <field name="lft">68</field>
+                <field name="rgt">71</field>
+                <field name="value">Node 9</field>
+            </row>
+            <row>
+                <field name="id">12</field>
+                <field name="lft">3</field>
+                <field name="rgt">4</field>
+                <field name="value">Sub node 0</field>
+            </row>
+            <row>
+                <field name="id">13</field>
+                <field name="lft">11</field>
+                <field name="rgt">12</field>
+                <field name="value">Sub node 1</field>
+            </row>
+            <row>
+                <field name="id">14</field>
+                <field name="lft">9</field>
+                <field name="rgt">10</field>
+                <field name="value">Sub node 2</field>
+            </row>
+            <row>
+                <field name="id">15</field>
+                <field name="lft">35</field>
+                <field name="rgt">36</field>
+                <field name="value">Sub node 3</field>
+            </row>
+            <row>
+                <field name="id">16</field>
+                <field name="lft">39</field>
+                <field name="rgt">40</field>
+                <field name="value">Sub node 4</field>
+            </row>
+            <row>
+                <field name="id">17</field>
+                <field name="lft">53</field>
+                <field name="rgt">54</field>
+                <field name="value">Sub node 5</field>
+            </row>
+            <row>
+                <field name="id">18</field>
+                <field name="lft">57</field>
+                <field name="rgt">58</field>
+                <field name="value">Sub node 6</field>
+            </row>
+            <row>
+                <field name="id">19</field>
+                <field name="lft">61</field>
+                <field name="rgt">62</field>
+                <field name="value">Sub node 7</field>
+            </row>
+            <row>
+                <field name="id">20</field>
+                <field name="lft">65</field>
+                <field name="rgt">66</field>
+                <field name="value">Sub node 8</field>
+            </row>
+            <row>
+                <field name="id">21</field>
+                <field name="lft">69</field>
+                <field name="rgt">70</field>
+                <field name="value">Sub node 9</field>
+            </row>
+            <row>
+                <field name="id">22</field>
+                <field name="lft">13</field>
+                <field name="rgt">14</field>
+                <field name="value">Extra sub 1</field>
+            </row>
+            <row>
+                <field name="id">23</field>
+                <field name="lft">15</field>
+                <field name="rgt">26</field>
+                <field name="value">Extra sub 2</field>
+            </row>
+            <row>
+                <field name="id">24</field>
+                <field name="lft">27</field>
+                <field name="rgt">28</field>
+                <field name="value">Extra sub 3</field>
+            </row>
+            <row>
+                <field name="id">25</field>
+                <field name="lft">29</field>
+                <field name="rgt">30</field>
+                <field name="value">Extra sub 4</field>
+            </row>
+            <row>
+                <field name="id">26</field>
+                <field name="lft">31</field>
+                <field name="rgt">32</field>
+                <field name="value">Extra sub 5</field>
+            </row>
+            <row>
+                <field name="id">27</field>
+                <field name="lft">41</field>
+                <field name="rgt">42</field>
+                <field name="value">Extra sub 1</field>
+            </row>
+            <row>
+                <field name="id">28</field>
+                <field name="lft">43</field>
+                <field name="rgt">44</field>
+                <field name="value">Extra sub 2</field>
+            </row>
+            <row>
+                <field name="id">29</field>
+                <field name="lft">45</field>
+                <field name="rgt">46</field>
+                <field name="value">Extra sub 3</field>
+            </row>
+            <row>
+                <field name="id">30</field>
+                <field name="lft">47</field>
+                <field name="rgt">48</field>
+                <field name="value">Extra sub 4</field>
+            </row>
+            <row>
+                <field name="id">31</field>
+                <field name="lft">49</field>
+                <field name="rgt">50</field>
+                <field name="value">Extra sub 5</field>
+            </row>
+            <row>
+                <field name="id">32</field>
+                <field name="lft">16</field>
+                <field name="rgt">17</field>
+                <field name="value">Extra extra sub 1</field>
+            </row>
+            <row>
+                <field name="id">33</field>
+                <field name="lft">18</field>
+                <field name="rgt">19</field>
+                <field name="value">Extra extra sub 2</field>
+            </row>
+            <row>
+                <field name="id">34</field>
+                <field name="lft">20</field>
+                <field name="rgt">21</field>
+                <field name="value">Extra extra sub 3</field>
+            </row>
+            <row>
+                <field name="id">35</field>
+                <field name="lft">22</field>
+                <field name="rgt">23</field>
+                <field name="value">Extra extra sub 4</field>
+            </row>
+            <row>
+                <field name="id">36</field>
+                <field name="lft">24</field>
+                <field name="rgt">25</field>
+                <field name="value">Extra extra sub 5</field>
+            </row>
+        </table_data>
+    </database>
+</mysqldump>
