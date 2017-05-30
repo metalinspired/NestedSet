@@ -106,13 +106,37 @@ class Manipulate extends AbstractNestedSet
     /**
      * Moves a range between, and including, provided left and right values
      *
-     * @param int $sourceLeft  Source node left value
-     * @param int $sourceRight Source node right value
-     * @param int $destination Destination for source node
+     * @param int    $sourceLeft  Source node left value
+     * @param int    $sourceRight Source node right value
+     * @param int    $destination Destination for source node
+     * @param string $position    Move node to before/after destination or make it a child of destination node
      * @return int Number of rows affected (Nodes moved)
      */
-    protected function moveRange($sourceLeft, $sourceRight, $destination)
+    protected function moveRange($sourceLeft, $sourceRight, $destination, $position)
     {
+        /*
+         * Determine exact destination for moving node
+         */
+        $result = $this->getGetLeftRightStatement()->execute([':id' => $destination]);
+
+        if (1 !== $result->getAffectedRows()) {
+            throw new Exception\RuntimeException(sprintf(
+                'Destination node with identifier %s was not found or not unique',
+                $destination
+            ));
+        }
+
+        switch ($position) {
+            case self::MOVE_AFTER:
+                $destination = (int)$result->current()['rgt'] + 1;
+                break;
+            case self::MOVE_BEFORE:
+                $destination = (int)$result->current()['lft'];
+                break;
+            case self::MOVE_MAKE_CHILD:
+                $destination = (int)$result->current()['rgt'];
+        }
+
         /*
          * Calculate size of moving node
          */
@@ -433,34 +457,7 @@ class Manipulate extends AbstractNestedSet
         $sourceLeft = (int)$result->current()['lft'];
         $sourceRight = (int)$result->current()['rgt'];
 
-        /*
-         * Determine exact destination for moving node
-         */
-        $result = $this->getGetLeftRightStatement()->execute([':id' => $destination]);
-
-        if (!$result instanceof ResultInterface || !$result->isQueryResult()) {
-            throw new Exception\UnknownDbException();
-        }
-
-        if ($result->getAffectedRows() !== 1) {
-            throw new Exception\RuntimeException(sprintf(
-                'Destination node with identifier %s was not found or not unique',
-                $destination
-            ));
-        }
-
-        switch ($position) {
-            case self::MOVE_AFTER:
-                $destination = (int)$result->current()['rgt'] + 1;
-                break;
-            case self::MOVE_BEFORE:
-                $destination = (int)$result->current()['lft'];
-                break;
-            case self::MOVE_MAKE_CHILD:
-                $destination = (int)$result->current()['rgt'];
-        }
-
-        return $this->moveRange($sourceLeft, $sourceRight, $destination);
+        return $this->moveRange($sourceLeft, $sourceRight, $destination, $position);
     }
 
     /**
@@ -578,14 +575,36 @@ class Manipulate extends AbstractNestedSet
         return $result->getAffectedRows();
     }
 
+    /**
+     * Empties a node by moving its descendants to a new location
+     *
+     * @param int|string $parent      Identifier of parent node
+     * @param int|string $destination Identifier of destination node
+     * @param string     $position    Move node to before/after destination or make it a child of destination node
+     * @return int Number of affected rows (Nodes moved)
+     */
     public function clean($parent, $destination, $position = self::MOVE_MAKE_CHILD)
     {
-        // TODO: Since this and move method are 98% identical maybe move destination and position to moveRange
         if (!is_int($parent) && !is_string($parent)) {
             throw new Exception\InvalidNodeIdentifierException($parent);
         }
+
         if (!is_int($destination) && !is_string($destination)) {
             throw new Exception\InvalidNodeIdentifierException($destination);
+        }
+
+        if (!is_string($position)) {
+            throw new Exception\InvalidArgumentException(sprintf(
+                'Method expects integer as $where parameter. Instance of %s given',
+                is_object($position) ? get_class($position) : gettype($position)
+            ));
+        }
+
+        if ($position !== self::MOVE_AFTER && $position !== self::MOVE_BEFORE && $position !== self::MOVE_MAKE_CHILD) {
+            throw new Exception\InvalidArgumentException(sprintf(
+                '$where parameter value can be either \'after\', \'before\' or \'make_child\'. \'%s\' given',
+                $position
+            ));
         }
 
         /*
@@ -600,32 +619,19 @@ class Manipulate extends AbstractNestedSet
             ));
         }
 
-        $rangeLeft = (int)$result->current()['lft'] + 1;
-        $rangeRight = (int)$result->current()['rgt'] - 1;
+        $parentLeft = (int)$result->current()['lft'];
+        $parentRight = (int)$result->current()['rgt'];
 
         /*
-         * Get destination
+         * If parent node is empty bail
          */
-        $result = $this->getGetLeftRightStatement()->execute([':id' => $destination]);
-
-        if (1 !== $result->getAffectedRows()) {
-            throw new Exception\RuntimeException(sprintf(
-                'Destination node with identifier %s was not found or not unique',
-                $destination
-            ));
+        if ($parentLeft + 1 == $parentRight) {
+            return 0;
         }
 
-        switch ($position) {
-            case self::MOVE_AFTER:
-                $destination = (int)$result->current()['rgt'] + 1;
-                break;
-            case self::MOVE_BEFORE:
-                $destination = (int)$result->current()['lft'];
-                break;
-            case self::MOVE_MAKE_CHILD:
-                $destination = (int)$result->current()['rgt'];
-        }
+        $parentLeft++;
+        $parentRight--;
 
-        return $this->moveRange($rangeLeft, $rangeRight, $destination);
+        return $this->moveRange($parentLeft, $parentRight, $destination, $position);
     }
 }
