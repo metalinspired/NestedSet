@@ -469,9 +469,19 @@ class Manipulate extends AbstractNestedSet
      * @param int|string $destination Identifier of destination node
      * @param string     $position    Move node to before/after destination or make it a child of destination node
      * @return int Number of affected rows (Nodes moved)
+     * @throws Exception\RuntimeException
+     * @throws Exception\InvalidArgumentException
+     * @throws Exception\InvalidNodeIdentifierException
      */
     public function move($source, $destination, $position = self::MOVE_AFTER)
     {
+        /*
+         * Prevent user from moving root node
+         */
+        if ($this->rootNodeId == $source) {
+            throw new Exception\RuntimeException('Root node can\'t be moved');
+        }
+
         if (!is_int($source) && !is_string($source)) {
             throw new Exception\InvalidNodeIdentifierException($source, 'Source node');
         }
@@ -602,6 +612,9 @@ class Manipulate extends AbstractNestedSet
      * @param null|int|string $destination Identifier of destination node or null
      * @param string          $position    Move node to before/after destination or make it a child of destination node
      * @return int Number of affected rows (Nodes moved)
+     * @throws Exception\InvalidArgumentException
+     * @throws Exception\InvalidNodeIdentifierException
+     * @throws Exception\RuntimeException
      */
     public function clean($parent, $destination = null, $position = self::MOVE_MAKE_CHILD)
     {
