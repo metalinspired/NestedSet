@@ -38,6 +38,13 @@ class ManipulateTest extends AbstractTest
         );
     }
 
+    public function testMoveNodeAfterRootNode()
+    {
+        $this->expectException(RuntimeException::class);
+
+        $this->manipulate->moveAfter(20, 1);
+    }
+
     public function testMoveNodeBefore()
     {
 
@@ -51,6 +58,13 @@ class ManipulateTest extends AbstractTest
                 ->getTable($GLOBALS[self::DB_TABLE]),
             $this->getQueryTable()
         );
+    }
+
+    public function testMoveNodeBeforeRootNode()
+    {
+        $this->expectException(RuntimeException::class);
+
+        $this->manipulate->moveBefore(20, 1);
     }
 
     public function testMoveNodeMakeChild()
@@ -72,7 +86,7 @@ class ManipulateTest extends AbstractTest
     {
         $rows = $this->manipulate->delete(3);
 
-        $this->assertEquals( 12, $rows);
+        $this->assertEquals(12, $rows);
 
         $this->assertTablesEqual(
             $this
@@ -80,6 +94,13 @@ class ManipulateTest extends AbstractTest
                 ->getTable($GLOBALS[self::DB_TABLE]),
             $this->getQueryTable()
         );
+    }
+
+    public function testDeleteRootNode()
+    {
+        $this->expectException(RuntimeException::class);
+
+        $rows = $this->manipulate->delete(1);
     }
 
     public function testDeleteNonExistingNode()

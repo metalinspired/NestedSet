@@ -115,6 +115,13 @@ class Manipulate extends AbstractNestedSet
     protected function moveRange($sourceLeft, $sourceRight, $destination, $position)
     {
         /*
+         * Prevent user from moving nodes before or after root node
+         */
+        if ($this->rootNodeId == $destination && ($position == self::MOVE_BEFORE || $position == self::MOVE_AFTER)) {
+            throw new Exception\RuntimeException('Node(s) can not be moved before or after root node');
+        }
+
+        /*
          * Determine exact destination for moving node
          */
         $result = $this->getGetLeftRightStatement()->execute([':id' => $destination]);
@@ -560,6 +567,13 @@ class Manipulate extends AbstractNestedSet
     {
         if (!is_int($id) && !is_string($id)) {
             throw new Exception\InvalidNodeIdentifierException($id);
+        }
+
+        /*
+         * Prevent user from deleting root node
+         */
+        if ($this->rootNodeId == $id) {
+            throw new Exception\RuntimeException('Root node can\'t be deleted');
         }
 
         /*
