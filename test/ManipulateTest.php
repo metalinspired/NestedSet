@@ -82,6 +82,13 @@ class ManipulateTest extends AbstractTest
         );
     }
 
+    public function testMoveRootNode()
+    {
+        $this->expectException(RuntimeException::class);
+
+        $this->manipulate->move(1, 20);
+    }
+
     public function testDelete()
     {
         $rows = $this->manipulate->delete(3);
@@ -100,7 +107,7 @@ class ManipulateTest extends AbstractTest
     {
         $this->expectException(RuntimeException::class);
 
-        $rows = $this->manipulate->delete(1);
+        $this->manipulate->delete(1);
     }
 
     public function testDeleteNonExistingNode()
