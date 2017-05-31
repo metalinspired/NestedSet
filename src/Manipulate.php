@@ -274,6 +274,55 @@ class Manipulate extends AbstractNestedSet
         return $result->getAffectedRows();
     }
 
+    protected function deleteRange($left, $right)
+    {
+        /*
+         * Calculate size of node
+         */
+        $size = $right - $left + 1;
+
+        /*
+         * Delete the node including its children
+         */
+        $delete = new Delete($this->table);
+
+        $delete
+            ->where
+            ->greaterThanOrEqualTo(
+                new Expression(
+                    '?',
+                    [
+                        [$this->leftColumn => Expression::TYPE_IDENTIFIER]
+                    ]
+                ),
+                $left
+            )
+            ->lessThanOrEqualTo(
+                new Expression(
+                    '?',
+                    [
+                        [$this->rightColumn => Expression::TYPE_IDENTIFIER]
+                    ]
+                ),
+                $right
+            );
+
+        $result = $this->sql->prepareStatementForSqlObject($delete)->execute();
+
+        /*
+         * Close the gap left after deleting
+         */
+        $this->getCloseGapStatement()->execute([
+            ':source1' => $right,
+            ':size1' => $size,
+            ':source2' => $right,
+            ':size2' => $size,
+            ':source3' => $right
+        ]);
+
+        return $result->getAffectedRows();
+    }
+
     /**
      * Inserts new node with provided data
      *
@@ -528,83 +577,45 @@ class Manipulate extends AbstractNestedSet
         $nodeLeft = (int)$result->current()['lft'];
         $nodeRight = (int)$result->current()['rgt'];
 
-        /*
-         * Calculate size of node
-         */
-        $size = $nodeRight - $nodeLeft + 1;
-
-        /*
-         * Delete the node including its children
-         */
-        $delete = new Delete($this->table);
-
-        $delete
-            ->where
-            ->greaterThanOrEqualTo(
-                new Expression(
-                    '?',
-                    [
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER]
-                    ]
-                ),
-                $nodeLeft
-            )
-            ->lessThanOrEqualTo(
-                new Expression(
-                    '?',
-                    [
-                        [$this->rightColumn => Expression::TYPE_IDENTIFIER]
-                    ]
-                ),
-                $nodeRight
-            );
-
-        $result = $this->sql->prepareStatementForSqlObject($delete)->execute();
-
-        /*
-         * Close the gap left after deleting
-         */
-        $this->getCloseGapStatement()->execute([
-            ':source1' => $nodeRight,
-            ':size1' => $size,
-            ':source2' => $nodeRight,
-            ':size2' => $size,
-            ':source3' => $nodeRight
-        ]);
-
-        return $result->getAffectedRows();
+        return $this->deleteRange($nodeLeft, $nodeRight);
     }
 
     /**
-     * Empties a node by moving its descendants to a new location
+     * Empties a node by removing its descendants
+     * or by moving them to a new location
      *
-     * @param int|string $parent      Identifier of parent node
-     * @param int|string $destination Identifier of destination node
-     * @param string     $position    Move node to before/after destination or make it a child of destination node
+     * @param int|string      $parent      Identifier of parent node
+     * @param null|int|string $destination Identifier of destination node or null
+     * @param string          $position    Move node to before/after destination or make it a child of destination node
      * @return int Number of affected rows (Nodes moved)
      */
-    public function clean($parent, $destination, $position = self::MOVE_MAKE_CHILD)
+    public function clean($parent, $destination = null, $position = self::MOVE_MAKE_CHILD)
     {
         if (!is_int($parent) && !is_string($parent)) {
             throw new Exception\InvalidNodeIdentifierException($parent);
         }
 
-        if (!is_int($destination) && !is_string($destination)) {
+        if (!is_null($destination) && !is_int($destination) && !is_string($destination)) {
             throw new Exception\InvalidNodeIdentifierException($destination);
         }
 
-        if (!is_string($position)) {
-            throw new Exception\InvalidArgumentException(sprintf(
-                'Method expects integer as $where parameter. Instance of %s given',
-                is_object($position) ? get_class($position) : gettype($position)
-            ));
-        }
+        if (null !== $destination) {
+            if (!is_string($position)) {
+                throw new Exception\InvalidArgumentException(sprintf(
+                    'Method expects integer as $where parameter. Instance of %s given',
+                    is_object($position) ? get_class($position) : gettype($position)
+                ));
+            }
 
-        if ($position !== self::MOVE_AFTER && $position !== self::MOVE_BEFORE && $position !== self::MOVE_MAKE_CHILD) {
-            throw new Exception\InvalidArgumentException(sprintf(
-                '$where parameter value can be either \'after\', \'before\' or \'make_child\'. \'%s\' given',
-                $position
-            ));
+            if ($position !== self::MOVE_AFTER &&
+                $position !== self::MOVE_BEFORE &&
+                $position !== self::MOVE_MAKE_CHILD
+            ) {
+                throw new Exception\InvalidArgumentException(sprintf(
+                    '$where parameter value can be either \'after\', \'before\' or \'make_child\'. \'%s\' given',
+                    $position
+                ));
+            }
         }
 
         /*
@@ -632,6 +643,10 @@ class Manipulate extends AbstractNestedSet
         $parentLeft++;
         $parentRight--;
 
-        return $this->moveRange($parentLeft, $parentRight, $destination, $position);
+        if (null !== $destination) {
+            return $this->moveRange($parentLeft, $parentRight, $destination, $position);
+        }
+
+        return $this->deleteRange($parentLeft, $parentRight);
     }
 }

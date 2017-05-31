@@ -69,6 +69,10 @@ $manipulate->moveMakeChild($node2, $root1);
  
 // Delete a node (and all its children, if any)
 $manipulate->delete($node);
+ 
+// You can also empty a node by delete all of its descendants
+// or enter a node identifier as second parameter to move descendants to a new location
+$manipulate->clean($parentNode, $destinationNode);
 ```
 
 ## Retrieving records

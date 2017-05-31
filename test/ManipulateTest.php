@@ -91,13 +91,27 @@ class ManipulateTest extends AbstractTest
 
     public function testClean()
     {
-        $rows = $this->manipulate->clean(3, 4);
+        $rows = $this->manipulate->clean(3);
 
         $this->assertEquals(11, $rows);
 
         $this->assertTablesEqual(
             $this
                 ->createMySQLXMLDataSet(__DIR__ . '/Fixture/Clean.xml')
+                ->getTable($GLOBALS[self::DB_TABLE]),
+            $this->getQueryTable()
+        );
+    }
+
+    public function testCleanWithMoving()
+    {
+        $rows = $this->manipulate->clean(3, 4);
+
+        $this->assertEquals(11, $rows);
+
+        $this->assertTablesEqual(
+            $this
+                ->createMySQLXMLDataSet(__DIR__ . '/Fixture/CleanWithMoving.xml')
                 ->getTable($GLOBALS[self::DB_TABLE]),
             $this->getQueryTable()
         );
