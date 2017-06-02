@@ -43,9 +43,9 @@ class Config
 
     /**
      * @see AbstractNestedSet::$rootNodeId
-     * @var int|string
+     * @var int|string|null
      */
-    public $rootNodeId = 1;
+    public $rootNodeId;
 
     /**
      * @see Find::$columns

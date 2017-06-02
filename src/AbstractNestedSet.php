@@ -2,8 +2,11 @@
 
 namespace metalinspired\NestedSet;
 
-use metalinspired\NestedSet\Exception\InvalidArgumentException;
+use metalinspired\NestedSet\Exception;
 use Zend\Db\Adapter\AdapterInterface;
+use Zend\Db\Adapter\Driver\ResultInterface;
+use Zend\Db\Sql\Expression;
+use Zend\Db\Sql\Select;
 use Zend\Db\Sql\Sql;
 
 abstract class AbstractNestedSet
@@ -48,10 +51,11 @@ abstract class AbstractNestedSet
     /**
      * Identifier of root node
      * This is used to omit root node from results
+     * If set to null, default behavior, root node id will be automatically determined
      *
-     * @var int|string
+     * @var int|string|null
      */
-    protected $rootNodeId = 1;
+    protected $rootNodeId;
 
     /**
      * Cached statements
@@ -115,7 +119,7 @@ abstract class AbstractNestedSet
     public function setTable($table)
     {
         if (!is_string($table) && !is_array($table)) {
-            throw new InvalidArgumentException();
+            throw new Exception\InvalidArgumentException();
         }
 
         $this->statements = [];
@@ -217,25 +221,88 @@ abstract class AbstractNestedSet
      */
     public function getRootNodeId()
     {
+        if (null === $this->rootNodeId) {
+            $this->detectRootNodeId();
+        }
         return $this->rootNodeId;
     }
 
     /**
      * Sets identifier of root node
      *
-     * @param int|string $id Root node identifier
+     * @param int|string|null $id Root node identifier or null to detect the identifier
      * @return $this Provides a fluent interface
      */
     public function setRootNodeId($id)
     {
-        if (!is_int($id) && !is_string($id) || empty($id)) {
-            throw new Exception\InvalidNodeIdentifierException($id);
+        if (!is_null($id) && !is_int($id) && (!is_string($id) || empty($id))) {
+            throw new Exception\InvalidRootNodeIdentifierException($id);
         }
 
         $this->statements = [];
         $this->rootNodeId = $id;
 
         return $this;
+    }
+
+    protected function detectRootNodeId()
+    {
+        $selectLft = new Select($this->table);
+        $selectLft
+            ->columns([
+                'lft' => new Expression('MIN(' . $this->leftColumn . ')')
+            ], false);
+
+        $selectRgt = new Select($this->table);
+        $selectRgt
+            ->columns([
+                'rgt' => new Expression('MAX(' . $this->rightColumn . ')')
+            ], false);
+
+        $select = new Select(['root' => $this->table]);
+        $select
+            ->columns([$this->idColumn])
+            ->join(
+                ['lft' => $selectLft],
+                new Expression('1=1'),
+                []
+            )
+            ->join(
+                ['rgt' => $selectRgt],
+                new Expression('1=1'),
+                []
+            )
+            ->where
+            ->equalTo(
+                "root.{$this->leftColumn}",
+                new Expression(
+                    '?',
+                    [
+                        ["lft.lft" => Expression::TYPE_IDENTIFIER]
+                    ]
+                )
+            )
+            ->equalTo(
+                "root.{$this->rightColumn}",
+                new Expression(
+                    '?',
+                    [
+                        ["rgt.rgt" => Expression::TYPE_IDENTIFIER]
+                    ]
+                )
+            );
+
+        $result = $this->sql->prepareStatementForSqlObject($select)->execute();
+
+        if (!$result instanceof ResultInterface || !$result->isQueryResult()) {
+            throw new Exception\UnknownDbException();
+        }
+
+        if (1 !== $result->getAffectedRows()) {
+            throw new Exception\RootNodeNotDetectedException();
+        }
+
+        $this->rootNodeId = (int)$result->current()[$this->idColumn];
     }
 
     /**

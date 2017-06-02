@@ -19,6 +19,7 @@ class FindTest extends AbstractFindTest
 
         $config = Config::createWithPdo(self::$pdo);
         $config->table = $GLOBALS[self::DB_TABLE];
+        $config->rootNodeId = 1;
 
         $this->nestedSet = new Find($config);
     }
