@@ -117,7 +117,7 @@ class Manipulate extends AbstractNestedSet
         /*
          * Prevent user from moving nodes before or after root node
          */
-        if ($this->rootNodeId == $destination && ($position == self::MOVE_BEFORE || $position == self::MOVE_AFTER)) {
+        if ($this->getRootNodeId() == $destination && ($position == self::MOVE_BEFORE || $position == self::MOVE_AFTER)) {
             throw new Exception\RuntimeException('Node(s) can not be moved before or after root node');
         }
 
@@ -478,7 +478,7 @@ class Manipulate extends AbstractNestedSet
         /*
          * Prevent user from moving root node
          */
-        if ($this->rootNodeId == $source) {
+        if ($this->getRootNodeId() == $source) {
             throw new Exception\RuntimeException('Root node can\'t be moved');
         }
 
@@ -582,7 +582,7 @@ class Manipulate extends AbstractNestedSet
         /*
          * Prevent user from deleting root node
          */
-        if ($this->rootNodeId == $id) {
+        if ($this->getRootNodeId() == $id) {
             throw new Exception\RuntimeException('Root node can\'t be deleted');
         }
 

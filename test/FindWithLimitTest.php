@@ -20,6 +20,7 @@ class FindWithLimitTest extends AbstractFindTest
         $config = Config::createWithPdo(self::$pdo);
         $config->table = $GLOBALS[self::DB_TABLE];
         $config->depthLimit = 2;
+        $config->rootNodeId = 1;
 
         $this->nestedSet = new Find($config);
     }

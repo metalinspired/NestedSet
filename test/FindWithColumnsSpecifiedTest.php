@@ -20,6 +20,7 @@ class FindWithColumnsSpecifiedTest extends AbstractFindTest
         $config = Config::createWithPdo(self::$pdo);
         $config->table = $GLOBALS[self::DB_TABLE];
         $config->columns = self::$customColumns;
+        $config->rootNodeId = 1;
 
         $this->nestedSet = new Find($config);
     }

@@ -187,7 +187,7 @@ class Find extends AbstractNestedSet
                 ["t.{$this->rightColumn}" => Expression::TYPE_IDENTIFIER],
                 ['q.rgt' => Expression::TYPE_IDENTIFIER],
                 ["t.{$this->idColumn}" => Expression::TYPE_IDENTIFIER],
-                $this->rootNodeId
+                $this->getRootNodeId()
             ]
         );
 
@@ -307,7 +307,7 @@ class Find extends AbstractNestedSet
                         ["parent.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 ),
-                $this->rootNodeId
+                $this->getRootNodeId()
             );
 
         if ($this->includeSearchingNode) {
@@ -392,7 +392,7 @@ class Find extends AbstractNestedSet
                         ["t.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 ),
-                $this->rootNodeId
+                $this->getRootNodeId()
             );
 
         $predicate = new Predicate();
@@ -623,7 +623,7 @@ class Find extends AbstractNestedSet
                         ["t.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
                     ]
                 ),
-                $this->rootNodeId
+                $this->getRootNodeId()
             );
 
         $predicate = new Predicate();

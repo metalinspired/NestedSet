@@ -21,6 +21,8 @@ class ManipulateTest extends AbstractTest
 
         $config = Config::createWithPdo(self::$pdo);
         $config->table = $GLOBALS[self::DB_TABLE];
+        $config->rootNodeId = 1;
+
         $this->manipulate = new Manipulate($config);
     }
 
