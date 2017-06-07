@@ -13,7 +13,7 @@ use Zend\Db\Sql\Update;
 
 class Manipulate extends AbstractNestedSet
 {
-    // TODO: implement method for moving all nodes children
+    use CreateInsertGapTrait;
 
     /**
      * Constants for move method
@@ -59,12 +59,7 @@ class Manipulate extends AbstractNestedSet
                 ])
                 ->where
                 ->greaterThan(
-                    new Expression(
-                        '?',
-                        [
-                            [$this->rightColumn => Expression::TYPE_IDENTIFIER]
-                        ]
-                    ),
+                    $this->rightColumn,
                     new Expression(':source3')
                 );
 
@@ -81,9 +76,9 @@ class Manipulate extends AbstractNestedSet
      *
      * @return StatementInterface
      */
-    protected function getGetLeftRightStatement()
+    protected function getCommonColumns()
     {
-        if (!array_key_exists('get_left_right', $this->statements)) {
+        if (!array_key_exists('common_columns', $this->statements)) {
             $select = new Select($this->table);
 
             $select
@@ -97,10 +92,10 @@ class Manipulate extends AbstractNestedSet
                     new Expression(':id')
                 );
 
-            $this->statements['get_left_right'] = $this->sql->prepareStatementForSqlObject($select);
+            $this->statements['common_columns'] = $this->sql->prepareStatementForSqlObject($select);
         }
 
-        return $this->statements['get_left_right'];
+        return $this->statements['common_columns'];
     }
 
     /**
@@ -114,17 +109,21 @@ class Manipulate extends AbstractNestedSet
      */
     protected function moveRange($sourceLeft, $sourceRight, $destination, $position)
     {
+        // TODO: Insert checking if user is trying to make node child of its children
+
         /*
          * Prevent user from moving nodes before or after root node
          */
-        if ($this->getRootNodeId() == $destination && ($position == self::MOVE_BEFORE || $position == self::MOVE_AFTER)) {
+        if ($this->getRootNodeId() == $destination &&
+            ($position == self::MOVE_BEFORE || $position == self::MOVE_AFTER)
+        ) {
             throw new Exception\RuntimeException('Node(s) can not be moved before or after root node');
         }
 
         /*
          * Determine exact destination for moving node
          */
-        $result = $this->getGetLeftRightStatement()->execute([':id' => $destination]);
+        $result = $this->getCommonColumns()->execute([':id' => $destination]);
 
         if (1 !== $result->getAffectedRows()) {
             throw new Exception\RuntimeException(sprintf(
@@ -135,82 +134,29 @@ class Manipulate extends AbstractNestedSet
 
         switch ($position) {
             case self::MOVE_AFTER:
-                $destination = (int)$result->current()['rgt'] + 1;
+                $destination = (int)$result->current()['rgt'];
                 break;
             case self::MOVE_BEFORE:
                 $destination = (int)$result->current()['lft'];
                 break;
             case self::MOVE_MAKE_CHILD:
-                $destination = (int)$result->current()['rgt'];
+                $destination = (int)$result->current()['rgt'] - 1;
         }
+
+        /*
+         * Check if node is moving backwards
+         */
+        $isNegativeMovement = $sourceLeft > $destination ? true : false;
 
         /*
          * Calculate size of moving node
          */
-        $size = $sourceRight - $sourceLeft + 1;
+        $nodeSize = $sourceRight - $sourceLeft + 1;
 
         /*
-         * Calculate the distance between old and new position
+         * Calculate size of movement
          */
-        $distance = $destination - $sourceLeft;
-
-        /*
-         * Backward movement must account for new space
-         */
-        if ($distance < 0) {
-            $distance -= $size;
-            $sourceLeft += $size;
-        }
-
-        /*
-         * Create gap
-         */
-        if (!array_key_exists('create_gap__move', $this->statements)) {
-            $createGapStatement = new Update($this->table);
-
-            $createGapStatement
-                ->set([
-                    $this->leftColumn => new Expression(
-                        '(CASE WHEN ? >= :destination1 THEN ? + :size1 ELSE ? END)',
-                        [
-                            [$this->leftColumn => Expression::TYPE_IDENTIFIER],
-                            [$this->leftColumn => Expression::TYPE_IDENTIFIER],
-                            [$this->leftColumn => Expression::TYPE_IDENTIFIER]
-                        ]
-                    ),
-                    $this->rightColumn => new Expression(
-                        '(CASE WHEN ? >= :destination2 THEN ? + :size2 ELSE ? END)',
-                        [
-                            [$this->rightColumn => Expression::TYPE_IDENTIFIER],
-                            [$this->rightColumn => Expression::TYPE_IDENTIFIER],
-                            [$this->rightColumn => Expression::TYPE_IDENTIFIER]
-                        ]
-                    )
-                ])
-                ->where
-                ->greaterThanOrEqualTo(
-                    new Expression(
-                        '?',
-                        [
-                            [$this->rightColumn => Expression::TYPE_IDENTIFIER]
-                        ]
-                    ),
-                    new Expression(':destination3')
-                );
-
-            $this->statements['create_gap__move'] = $this->sql->prepareStatementForSqlObject($createGapStatement);
-        }
-
-        /** @var StatementInterface $createGapStatement */
-        $createGapStatement = $this->statements['create_gap__move'];
-
-        $createGapStatement->execute([
-            ':destination1' => $destination,
-            ':size1' => $size,
-            ':destination2' => $destination,
-            ':size2' => $size,
-            ':destination3' => $destination
-        ]);
+        $movementSize = $destination - ($isNegativeMovement ? $sourceLeft - 1 : $sourceRight);
 
         /*
          * Move node to its new position
@@ -221,36 +167,38 @@ class Manipulate extends AbstractNestedSet
             $moveStatement
                 ->set([
                     $this->leftColumn => new Expression(
-                        '? + :distance1',
+                        '(CASE ' .
+                        'WHEN ? BETWEEN :sourceLeft1 AND :sourceRight1 THEN ? + :increase1 ' .
+                        'ELSE ? - :decrease1 END)',
                         [
+                            [$this->leftColumn => Expression::TYPE_IDENTIFIER],
+                            [$this->leftColumn => Expression::TYPE_IDENTIFIER],
                             [$this->leftColumn => Expression::TYPE_IDENTIFIER]
                         ]
                     ),
                     $this->rightColumn => new Expression(
-                        '? + :distance2',
+                        '(CASE ' .
+                        'WHEN ? BETWEEN :sourceLeft2 AND :sourceRight2 THEN ? + :increase2 ' .
+                        'WHEN ? = :rgtIgnore THEN ? ' .
+                        'ELSE ? - :decrease2 ' .
+                        'END)',
                         [
+                            [$this->rightColumn => Expression::TYPE_IDENTIFIER],
+                            [$this->rightColumn => Expression::TYPE_IDENTIFIER],
+                            [$this->rightColumn => Expression::TYPE_IDENTIFIER],
+                            [$this->rightColumn => Expression::TYPE_IDENTIFIER],
                             [$this->rightColumn => Expression::TYPE_IDENTIFIER]
                         ]
                     )
                 ])
                 ->where
                 ->greaterThanOrEqualTo(
-                    new Expression(
-                        '?',
-                        [
-                            [$this->leftColumn => Expression::TYPE_IDENTIFIER]
-                        ]
-                    ),
-                    new Expression(':source1')
+                    $this->leftColumn,
+                    new Expression(':from')
                 )
-                ->lessThan(
-                    new Expression(
-                        '?',
-                        [
-                            [$this->rightColumn => Expression::TYPE_IDENTIFIER]
-                        ]
-                    ),
-                    new Expression(':source2 + :size')
+                ->lessThanOrEqualTo(
+                    $this->rightColumn,
+                    new Expression(':to')
                 );
 
             $this->statements['move'] = $this->sql->prepareStatementForSqlObject($moveStatement);
@@ -260,22 +208,17 @@ class Manipulate extends AbstractNestedSet
         $moveStatement = $this->statements['move'];
 
         $result = $moveStatement->execute([
-            ':distance1' => $distance,
-            ':distance2' => $distance,
-            ':source1' => $sourceLeft,
-            ':source2' => $sourceLeft,
-            ':size' => $size
-        ]);
-
-        /*
-         * Remove gap created after node has been moved
-         */
-        $this->getCloseGapStatement()->execute([
-            ':source1' => $sourceRight,
-            ':size1' => $size,
-            ':source2' => $sourceRight,
-            ':size2' => $size,
-            ':source3' => $sourceRight
+            ':sourceLeft1' => $sourceLeft,
+            ':sourceRight1' => $sourceRight,
+            ':increase1' => $movementSize,
+            ':decrease1' => $nodeSize * ($isNegativeMovement ? -1 : 1),
+            ':sourceLeft2' => $sourceLeft,
+            ':sourceRight2' => $sourceRight,
+            ':increase2' => $movementSize,
+            ':rgtIgnore' => ($isNegativeMovement ? $sourceRight : $destination) + 1,
+            ':decrease2' => $nodeSize * ($isNegativeMovement ? -1 : 1),
+            ':from' => $sourceLeft + ($isNegativeMovement ? $movementSize : 0),
+            ':to' => ($isNegativeMovement ? $sourceRight : $destination) + 1
         ]);
 
         return $result->getAffectedRows();
@@ -296,21 +239,11 @@ class Manipulate extends AbstractNestedSet
         $delete
             ->where
             ->greaterThanOrEqualTo(
-                new Expression(
-                    '?',
-                    [
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER]
-                    ]
-                ),
+                $this->leftColumn,
                 $left
             )
             ->lessThanOrEqualTo(
-                new Expression(
-                    '?',
-                    [
-                        [$this->rightColumn => Expression::TYPE_IDENTIFIER]
-                    ]
-                ),
+                $this->rightColumn,
                 $right
             );
 
@@ -328,96 +261,6 @@ class Manipulate extends AbstractNestedSet
         ]);
 
         return $result->getAffectedRows();
-    }
-
-    /**
-     * Inserts new node with provided data
-     *
-     * @param int|string $parent Identifier of parent node
-     * @param array      $data   Data for new node
-     * @return mixed|null Identifier for newly created node
-     * @throws Exception\InvalidNodeIdentifierException
-     * @throws Exception\RuntimeException
-     */
-    public function insert($parent, array $data = [])
-    {
-        if (!is_int($parent) && !is_string($parent)) {
-            throw new Exception\InvalidNodeIdentifierException($parent, 'Parent');
-        }
-
-        /*
-         * Get parents right column value as left column value for new node
-         */
-        $result = $this->getGetLeftRightStatement()->execute([':id' => $parent]);
-
-        if (0 === $result->getAffectedRows()) {
-            throw new Exception\RuntimeException(sprintf(
-                "Parent with identifier %s was not found or not unique",
-                $parent
-            ));
-        }
-        $newPosition = (int)$result->current()['rgt'];
-
-        /*
-         * Create a gap to insert new record
-         */
-        if (!array_key_exists('create_gap__insert', $this->statements)) {
-            $createGap = new Update($this->table);
-
-            $createGap
-                ->set([
-                    $this->rightColumn => new Expression(
-                        '? + 2',
-                        [
-                            [$this->rightColumn => Expression::TYPE_IDENTIFIER]
-                        ]
-                    ),
-                    $this->leftColumn => new Expression(
-                        '(CASE WHEN ? > :newPosition THEN ? + 2 ELSE ? END)',
-                        [
-                            [$this->leftColumn => Expression::TYPE_IDENTIFIER],
-                            [$this->leftColumn => Expression::TYPE_IDENTIFIER],
-                            [$this->leftColumn => Expression::TYPE_IDENTIFIER]
-                        ]
-                    )
-                ])
-                ->where
-                ->greaterThanOrEqualTo(
-                    new Expression(
-                        '?',
-                        [
-                            [$this->rightColumn => Expression::TYPE_IDENTIFIER]
-                        ]
-                    ),
-                    new Expression(':newPositionWhere')
-                );
-
-            $this->statements['create_gap__insert'] = $this->sql->prepareStatementForSqlObject($createGap);
-        }
-
-        /** @var StatementInterface $createGap */
-        $createGap = $this->statements['create_gap__insert'];
-
-        $createGap->execute([
-            ':newPosition' => $newPosition,
-            ':newPositionWhere' => $newPosition
-        ]);
-
-        /*
-         * Insert new data
-         */
-        $data[$this->leftColumn] = $newPosition;
-        $data[$this->rightColumn] = $newPosition + 1;
-
-        //if (!array_key_exists('insert', $this->statements)) {
-        $insert = new Insert($this->table);
-
-        $insert->values($data);
-        //}
-
-        $result = $this->sql->prepareStatementForSqlObject($insert)->execute();
-
-        return $result->getGeneratedValue();
     }
 
     /**
@@ -456,6 +299,61 @@ class Manipulate extends AbstractNestedSet
             $this->leftColumn => 1,
             $this->rightColumn => 2
         ]);
+
+        $result = $this->sql->prepareStatementForSqlObject($insert)->execute();
+
+        return $result->getGeneratedValue();
+    }
+
+    /**
+     * Inserts new node with provided data
+     *
+     * @param int|string $parent Identifier of parent node
+     * @param array      $data   Data for new node
+     * @return mixed|null Identifier for newly created node
+     * @throws Exception\InvalidNodeIdentifierException
+     * @throws Exception\RuntimeException
+     *
+     * TODO: add ability to insert after or before a node, like in move method
+     */
+    public function insert($parent, array $data = [])
+    {
+        if (!is_int($parent) && !is_string($parent)) {
+            throw new Exception\InvalidNodeIdentifierException($parent, 'Parent');
+        }
+
+        /*
+         * Get parents right column value as left column value for new node
+         */
+        $result = $this->getCommonColumns()->execute([':id' => $parent]);
+
+        if (0 === $result->getAffectedRows()) {
+            throw new Exception\RuntimeException(sprintf(
+                "Parent with identifier %s was not found or not unique",
+                $parent
+            ));
+        }
+        $newPosition = (int)$result->current()['rgt'];
+
+        /*
+         * Create a gap to insert new record
+         */
+        $createGap = $this->getInsertMethodCreateGapStatement();
+
+        $createGap->execute([
+            ':newPosition' => $newPosition,
+            ':newPositionWhere' => $newPosition
+        ]);
+
+        /*
+         * Insert new data
+         */
+        $data[$this->leftColumn] = $newPosition;
+        $data[$this->rightColumn] = $newPosition + 1;
+
+        $insert = new Insert($this->table);
+
+        $insert->values($data);
 
         $result = $this->sql->prepareStatementForSqlObject($insert)->execute();
 
@@ -507,7 +405,7 @@ class Manipulate extends AbstractNestedSet
         /*
          * Get left and right values of moving node
          */
-        $result = $this->getGetLeftRightStatement()->execute([':id' => $source]);
+        $result = $this->getCommonColumns()->execute([':id' => $source]);
 
         if (!$result instanceof ResultInterface || !$result->isQueryResult()) {
             throw new Exception\UnknownDbException();
@@ -589,7 +487,7 @@ class Manipulate extends AbstractNestedSet
         /*
          * Get right and left values of node that is being deleted
          */
-        $result = $this->getGetLeftRightStatement()->execute([':id' => $id]);
+        $result = $this->getCommonColumns()->execute([':id' => $id]);
 
         if (1 !== $result->getAffectedRows()) {
             throw new Exception\RuntimeException(sprintf(
@@ -648,7 +546,7 @@ class Manipulate extends AbstractNestedSet
         /*
          * Get left and right value of parent node
          */
-        $result = $this->getGetLeftRightStatement()->execute([':id' => $parent]);
+        $result = $this->getCommonColumns()->execute([':id' => $parent]);
 
         if (1 !== $result->getAffectedRows()) {
             throw new Exception\RuntimeException(sprintf(

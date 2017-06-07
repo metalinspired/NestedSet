@@ -22,7 +22,6 @@ class ManipulateTest extends AbstractTest
         $config = Config::createWithPdo(self::$pdo);
         $config->table = $GLOBALS[self::DB_TABLE];
         $config->rootNodeId = 1;
-
         $this->manipulate = new Manipulate($config);
     }
 
@@ -30,13 +29,26 @@ class ManipulateTest extends AbstractTest
     {
         $rows = $this->manipulate->moveAfter(3, 14);
 
-        $this->assertEquals(12, $rows);
+        $this->assertEquals(14, $rows);
+
+        $queryTables = $this->getQueryTables();
+        $dataSet = $this->createMySQLXMLDataSet(__DIR__ . '/Fixture/MoveNodeAfter.xml');
 
         $this->assertTablesEqual(
-            $this
-                ->createMySQLXMLDataSet(__DIR__ . '/Fixture/MoveNodeBehind.xml')
-                ->getTable($GLOBALS[self::DB_TABLE]),
-            $this->getQueryTable()
+            $dataSet->getTable($GLOBALS[self::DB_TABLE]),
+            $queryTables[self::DB_TABLE]
+        );
+
+        $rows = $this->manipulate->moveAfter(3, 2);
+
+        $this->assertEquals(14, $rows);
+
+        $queryTables = $this->getQueryTables();
+        $dataSet = $this->createMySQLXMLDataSet(__DIR__ . '/Fixture/Insert.xml');
+
+        $this->assertTablesEqual(
+            $dataSet->getTable($GLOBALS[self::DB_TABLE]),
+            $queryTables[self::DB_TABLE]
         );
     }
 
@@ -52,13 +64,14 @@ class ManipulateTest extends AbstractTest
 
         $rows = $this->manipulate->moveBefore(20, 4);
 
-        $this->assertEquals(1, $rows);
+        $this->assertEquals(18, $rows);
+
+        $queryTables = $this->getQueryTables();
+        $dataSet = $this->createMySQLXMLDataSet(__DIR__ . '/Fixture/MoveNodeBefore.xml');
 
         $this->assertTablesEqual(
-            $this
-                ->createMySQLXMLDataSet(__DIR__ . '/Fixture/MoveNodeBefore.xml')
-                ->getTable($GLOBALS[self::DB_TABLE]),
-            $this->getQueryTable()
+            $dataSet->getTable($GLOBALS[self::DB_TABLE]),
+            $queryTables[self::DB_TABLE]
         );
     }
 
@@ -74,13 +87,14 @@ class ManipulateTest extends AbstractTest
 
         $rows = $this->manipulate->moveMakeChild(20, 9);
 
-        $this->assertEquals(1, $rows);
+        $this->assertEquals(2, $rows);
+
+        $queryTables = $this->getQueryTables();
+        $dataSet = $this->createMySQLXMLDataSet(__DIR__ . '/Fixture/MoveNodeChild.xml');
 
         $this->assertTablesEqual(
-            $this
-                ->createMySQLXMLDataSet(__DIR__ . '/Fixture/MoveNodeChild.xml')
-                ->getTable($GLOBALS[self::DB_TABLE]),
-            $this->getQueryTable()
+            $dataSet->getTable($GLOBALS[self::DB_TABLE]),
+            $queryTables[self::DB_TABLE]
         );
     }
 
@@ -97,11 +111,12 @@ class ManipulateTest extends AbstractTest
 
         $this->assertEquals(12, $rows);
 
+        $queryTables = $this->getQueryTables();
+        $dataSet = $this->createMySQLXMLDataSet(__DIR__ . '/Fixture/Delete.xml');
+
         $this->assertTablesEqual(
-            $this
-                ->createMySQLXMLDataSet(__DIR__ . '/Fixture/Delete.xml')
-                ->getTable($GLOBALS[self::DB_TABLE]),
-            $this->getQueryTable()
+            $dataSet->getTable($GLOBALS[self::DB_TABLE]),
+            $queryTables[self::DB_TABLE]
         );
     }
 
@@ -123,13 +138,14 @@ class ManipulateTest extends AbstractTest
     {
         $rows = $this->manipulate->clean(3);
 
-        $this->assertEquals(11, $rows);
+        $this->assertEquals(13, $rows);
+
+        $queryTables = $this->getQueryTables();
+        $dataSet = $this->createMySQLXMLDataSet(__DIR__ . '/Fixture/Clean.xml');
 
         $this->assertTablesEqual(
-            $this
-                ->createMySQLXMLDataSet(__DIR__ . '/Fixture/Clean.xml')
-                ->getTable($GLOBALS[self::DB_TABLE]),
-            $this->getQueryTable()
+            $dataSet->getTable($GLOBALS[self::DB_TABLE]),
+            $queryTables[self::DB_TABLE]
         );
     }
 
@@ -137,13 +153,14 @@ class ManipulateTest extends AbstractTest
     {
         $rows = $this->manipulate->clean(3, 4);
 
-        $this->assertEquals(11, $rows);
+        $this->assertEquals(13, $rows);
+
+        $queryTables = $this->getQueryTables();
+        $dataSet = $this->createMySQLXMLDataSet(__DIR__ . '/Fixture/CleanWithMoving.xml');
 
         $this->assertTablesEqual(
-            $this
-                ->createMySQLXMLDataSet(__DIR__ . '/Fixture/CleanWithMoving.xml')
-                ->getTable($GLOBALS[self::DB_TABLE]),
-            $this->getQueryTable()
+            $dataSet->getTable($GLOBALS[self::DB_TABLE]),
+            $queryTables[self::DB_TABLE]
         );
     }
 }
