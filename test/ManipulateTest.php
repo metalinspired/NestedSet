@@ -3,6 +3,7 @@
 namespace metalinspired\NestedSetTest;
 
 use metalinspired\NestedSet\Config;
+use metalinspired\NestedSet\Exception\NodeIsOwnChildException;
 use metalinspired\NestedSet\Exception\RuntimeException;
 use metalinspired\NestedSet\Manipulate;
 
@@ -64,7 +65,7 @@ class ManipulateTest extends AbstractTest
 
         $rows = $this->manipulate->moveBefore(20, 4);
 
-        $this->assertEquals(18, $rows);
+        $this->assertEquals(19, $rows);
 
         $queryTables = $this->getQueryTables();
         $dataSet = $this->createMySQLXMLDataSet(__DIR__ . '/Fixture/MoveNodeBefore.xml');
@@ -84,13 +85,24 @@ class ManipulateTest extends AbstractTest
 
     public function testMoveNodeMakeChild()
     {
-
         $rows = $this->manipulate->moveMakeChild(20, 9);
 
-        $this->assertEquals(2, $rows);
+        $this->assertEquals(3, $rows);
 
         $queryTables = $this->getQueryTables();
         $dataSet = $this->createMySQLXMLDataSet(__DIR__ . '/Fixture/MoveNodeChild.xml');
+
+        $this->assertTablesEqual(
+            $dataSet->getTable($GLOBALS[self::DB_TABLE]),
+            $queryTables[self::DB_TABLE]
+        );
+
+        $rows = $this->manipulate->moveMakeChild(20, 10);
+
+        $this->assertEquals(3, $rows);
+
+        $queryTables = $this->getQueryTables();
+        $dataSet = $this->createMySQLXMLDataSet(__DIR__ . '/Fixture/Insert.xml');
 
         $this->assertTablesEqual(
             $dataSet->getTable($GLOBALS[self::DB_TABLE]),
@@ -138,7 +150,7 @@ class ManipulateTest extends AbstractTest
     {
         $rows = $this->manipulate->clean(3);
 
-        $this->assertEquals(13, $rows);
+        $this->assertEquals(11, $rows);
 
         $queryTables = $this->getQueryTables();
         $dataSet = $this->createMySQLXMLDataSet(__DIR__ . '/Fixture/Clean.xml');
@@ -153,10 +165,47 @@ class ManipulateTest extends AbstractTest
     {
         $rows = $this->manipulate->clean(3, 4);
 
-        $this->assertEquals(13, $rows);
+        $this->assertEquals(14, $rows);
 
         $queryTables = $this->getQueryTables();
         $dataSet = $this->createMySQLXMLDataSet(__DIR__ . '/Fixture/CleanWithMoving.xml');
+
+        $this->assertTablesEqual(
+            $dataSet->getTable($GLOBALS[self::DB_TABLE]),
+            $queryTables[self::DB_TABLE]
+        );
+    }
+
+    public function testMoveNodeToBeItsOwnChild()
+    {
+        $this->expectException(NodeIsOwnChildException::class);
+
+        $this->manipulate->moveAfter(3, 33);
+    }
+
+    public function testMoveNodeToBeSiblingToItSelf()
+    {
+        $rows = $this->manipulate->moveAfter(3, 3);
+
+        $this->assertEquals(0, $rows);
+
+        $queryTables = $this->getQueryTables();
+        $dataSet = $this->createMySQLXMLDataSet(__DIR__ . '/Fixture/Insert.xml');
+
+        $this->assertTablesEqual(
+            $dataSet->getTable($GLOBALS[self::DB_TABLE]),
+            $queryTables[self::DB_TABLE]
+        );
+    }
+
+    public function testMoveToSamePosition()
+    {
+        $rows = $this->manipulate->moveAfter(3, 2);
+
+        $this->assertEquals(0, $rows);
+
+        $queryTables = $this->getQueryTables();
+        $dataSet = $this->createMySQLXMLDataSet(__DIR__ . '/Fixture/Insert.xml');
 
         $this->assertTablesEqual(
             $dataSet->getTable($GLOBALS[self::DB_TABLE]),

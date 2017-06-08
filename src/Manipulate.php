@@ -105,12 +105,10 @@ class Manipulate extends AbstractNestedSet
      * @param int    $sourceRight Source node right value
      * @param int    $destination Destination for source node
      * @param string $position    Move node to before/after destination or make it a child of destination node
-     * @return int Number of rows affected (Nodes moved)
+     * @return int Number of rows affected
      */
     protected function moveRange($sourceLeft, $sourceRight, $destination, $position)
     {
-        // TODO: Insert checking if user is trying to make node child of its children
-
         /*
          * Prevent user from moving nodes before or after root node
          */
@@ -137,16 +135,30 @@ class Manipulate extends AbstractNestedSet
                 $destination = (int)$result->current()['rgt'];
                 break;
             case self::MOVE_BEFORE:
-                $destination = (int)$result->current()['lft'];
+                $destination = (int)$result->current()['lft'] - 1;
                 break;
             case self::MOVE_MAKE_CHILD:
                 $destination = (int)$result->current()['rgt'] - 1;
         }
 
         /*
-         * Check if node is moving backwards
+         * Check if node is being set as its own child
          */
-        $isNegativeMovement = $sourceLeft > $destination ? true : false;
+        if ($destination >= $sourceLeft && $destination < $sourceRight) {
+            throw new Exception\NodeIsOwnChildException();
+        }
+
+        /*
+         * If node is moving backwards flip source range and nodes affected by move
+         */
+        if ($sourceLeft > $destination) {
+            $movementSize = $sourceLeft - $destination - 1;
+            $nodeSize = $sourceRight - $sourceLeft + 1;
+            $destination = $sourceRight;
+            $sourceLeft -= $movementSize;
+            $sourceRight -= $nodeSize;
+
+        }
 
         /*
          * Calculate size of moving node
@@ -156,10 +168,10 @@ class Manipulate extends AbstractNestedSet
         /*
          * Calculate size of movement
          */
-        $movementSize = $destination - ($isNegativeMovement ? $sourceLeft - 1 : $sourceRight);
+        $movementSize = $destination - $sourceRight;
 
         /*
-         * Move node to its new position
+         * Move nodes
          */
         if (!array_key_exists('move', $this->statements)) {
             $moveStatement = new Update($this->table);
@@ -168,9 +180,12 @@ class Manipulate extends AbstractNestedSet
                 ->set([
                     $this->leftColumn => new Expression(
                         '(CASE ' .
-                        'WHEN ? BETWEEN :sourceLeft1 AND :sourceRight1 THEN ? + :increase1 ' .
-                        'ELSE ? - :decrease1 END)',
+                        'WHEN ? BETWEEN :increase1start AND :increase1end THEN ? + :increase1 ' .
+                        'WHEN ? BETWEEN :decrease1start AND :decrease1end THEN ? - :decrease1 ' .
+                        'ELSE ? END)',
                         [
+                            [$this->leftColumn => Expression::TYPE_IDENTIFIER],
+                            [$this->leftColumn => Expression::TYPE_IDENTIFIER],
                             [$this->leftColumn => Expression::TYPE_IDENTIFIER],
                             [$this->leftColumn => Expression::TYPE_IDENTIFIER],
                             [$this->leftColumn => Expression::TYPE_IDENTIFIER]
@@ -178,9 +193,9 @@ class Manipulate extends AbstractNestedSet
                     ),
                     $this->rightColumn => new Expression(
                         '(CASE ' .
-                        'WHEN ? BETWEEN :sourceLeft2 AND :sourceRight2 THEN ? + :increase2 ' .
-                        'WHEN ? = :rgtIgnore THEN ? ' .
-                        'ELSE ? - :decrease2 ' .
+                        'WHEN ? BETWEEN :increase2start AND :increase2end THEN ? + :increase2 ' .
+                        'WHEN ? BETWEEN :decrease2start AND :decrease2end THEN ? - :decrease2 ' .
+                        'ELSE ? ' .
                         'END)',
                         [
                             [$this->rightColumn => Expression::TYPE_IDENTIFIER],
@@ -192,13 +207,16 @@ class Manipulate extends AbstractNestedSet
                     )
                 ])
                 ->where
-                ->greaterThanOrEqualTo(
+                ->between(
                     $this->leftColumn,
-                    new Expression(':from')
+                    new Expression(':from1'),
+                    new Expression(':to1')
                 )
-                ->lessThanOrEqualTo(
+                ->or
+                ->between(
                     $this->rightColumn,
-                    new Expression(':to')
+                    new Expression(':from2'),
+                    new Expression(':to2')
                 );
 
             $this->statements['move'] = $this->sql->prepareStatementForSqlObject($moveStatement);
@@ -208,17 +226,22 @@ class Manipulate extends AbstractNestedSet
         $moveStatement = $this->statements['move'];
 
         $result = $moveStatement->execute([
-            ':sourceLeft1' => $sourceLeft,
-            ':sourceRight1' => $sourceRight,
+            ':increase1start' => $sourceLeft,
+            ':increase1end' => $sourceRight,
             ':increase1' => $movementSize,
-            ':decrease1' => $nodeSize * ($isNegativeMovement ? -1 : 1),
-            ':sourceLeft2' => $sourceLeft,
-            ':sourceRight2' => $sourceRight,
+            ':decrease1start' => $sourceRight + 1,
+            ':decrease1end' => $sourceRight + $movementSize,
+            ':decrease1' => $nodeSize,
+            ':increase2start' => $sourceLeft,
+            ':increase2end' => $sourceRight,
             ':increase2' => $movementSize,
-            ':rgtIgnore' => ($isNegativeMovement ? $sourceRight : $destination) + 1,
-            ':decrease2' => $nodeSize * ($isNegativeMovement ? -1 : 1),
-            ':from' => $sourceLeft + ($isNegativeMovement ? $movementSize : 0),
-            ':to' => ($isNegativeMovement ? $sourceRight : $destination) + 1
+            ':decrease2start' => $sourceRight + 1,
+            ':decrease2end' => $sourceRight + $movementSize,
+            ':decrease2' => $nodeSize,
+            ':from1' => $sourceLeft,
+            ':to1' => $destination + 1,
+            ':from2' => $sourceLeft,
+            ':to2' => $destination + 1
         ]);
 
         return $result->getAffectedRows();
@@ -366,7 +389,7 @@ class Manipulate extends AbstractNestedSet
      * @param int|string $source      Identifier of source node
      * @param int|string $destination Identifier of destination node
      * @param string     $position    Move node to before/after destination or make it a child of destination node
-     * @return int Number of affected rows (Nodes moved)
+     * @return int Number of affected rows
      * @throws Exception\RuntimeException
      * @throws Exception\InvalidArgumentException
      * @throws Exception\InvalidNodeIdentifierException
@@ -509,7 +532,7 @@ class Manipulate extends AbstractNestedSet
      * @param int|string      $parent      Identifier of parent node
      * @param null|int|string $destination Identifier of destination node or null
      * @param string          $position    Move node to before/after destination or make it a child of destination node
-     * @return int Number of affected rows (Nodes moved)
+     * @return int Number of affected rows
      * @throws Exception\InvalidArgumentException
      * @throws Exception\InvalidNodeIdentifierException
      * @throws Exception\RuntimeException
