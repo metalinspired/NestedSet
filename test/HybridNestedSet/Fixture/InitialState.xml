@@ -1,0 +1,12 @@
+<?xml version="1.0" ?>
+<dataset>
+    <table name="hybrid_nested_set">
+        <column>id</column>
+        <column>lft</column>
+        <column>rgt</column>
+        <column>parent</column>
+        <column>ordering</column>
+        <column>depth</column>
+        <column>value</column>
+    </table>
+</dataset>

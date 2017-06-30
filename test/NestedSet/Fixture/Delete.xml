@@ -1,0 +1,253 @@
+<?xml version="1.0"?>
+<mysqldump xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <database name="test">
+        <table_data name="nested_set">
+            <row>
+                <field name="id">1</field>
+                <field name="lft">1</field>
+                <field name="rgt">82</field>
+                <field name="value"></field>
+            </row>
+            <row>
+                <field name="id">2</field>
+                <field name="lft">2</field>
+                <field name="rgt">15</field>
+                <field name="value">Node 1</field>
+            </row>
+            <row>
+                <field name="id">6</field>
+                <field name="lft">3</field>
+                <field name="rgt">8</field>
+                <field name="value">Node 5</field>
+            </row>
+            <row>
+                <field name="id">7</field>
+                <field name="lft">4</field>
+                <field name="rgt">5</field>
+                <field name="value">Node 6</field>
+            </row>
+            <row>
+                <field name="id">8</field>
+                <field name="lft">6</field>
+                <field name="rgt">7</field>
+                <field name="value">Node 7</field>
+            </row>
+            <row>
+                <field name="id">9</field>
+                <field name="lft">9</field>
+                <field name="rgt">14</field>
+                <field name="value">Node 8</field>
+            </row>
+            <row>
+                <field name="id">10</field>
+                <field name="lft">10</field>
+                <field name="rgt">11</field>
+                <field name="value">Node 9</field>
+            </row>
+            <row>
+                <field name="id">11</field>
+                <field name="lft">12</field>
+                <field name="rgt">13</field>
+                <field name="value">Node 10</field>
+            </row>
+            <row>
+                <field name="id">12</field>
+                <field name="lft">16</field>
+                <field name="rgt">35</field>
+                <field name="value">Node 11</field>
+            </row>
+            <row>
+                <field name="id">13</field>
+                <field name="lft">17</field>
+                <field name="rgt">22</field>
+                <field name="value">Node 12</field>
+            </row>
+            <row>
+                <field name="id">14</field>
+                <field name="lft">18</field>
+                <field name="rgt">19</field>
+                <field name="value">Node 13</field>
+            </row>
+            <row>
+                <field name="id">15</field>
+                <field name="lft">20</field>
+                <field name="rgt">21</field>
+                <field name="value">Node 14</field>
+            </row>
+            <row>
+                <field name="id">16</field>
+                <field name="lft">23</field>
+                <field name="rgt">28</field>
+                <field name="value">Node 15</field>
+            </row>
+            <row>
+                <field name="id">17</field>
+                <field name="lft">24</field>
+                <field name="rgt">25</field>
+                <field name="value">Node 16</field>
+            </row>
+            <row>
+                <field name="id">18</field>
+                <field name="lft">26</field>
+                <field name="rgt">27</field>
+                <field name="value">Node 17</field>
+            </row>
+            <row>
+                <field name="id">19</field>
+                <field name="lft">29</field>
+                <field name="rgt">34</field>
+                <field name="value">Node 18</field>
+            </row>
+            <row>
+                <field name="id">20</field>
+                <field name="lft">30</field>
+                <field name="rgt">31</field>
+                <field name="value">Node 19</field>
+            </row>
+            <row>
+                <field name="id">21</field>
+                <field name="lft">32</field>
+                <field name="rgt">33</field>
+                <field name="value">Node 20</field>
+            </row>
+            <row>
+                <field name="id">22</field>
+                <field name="lft">36</field>
+                <field name="rgt">55</field>
+                <field name="value">Node 21</field>
+            </row>
+            <row>
+                <field name="id">23</field>
+                <field name="lft">37</field>
+                <field name="rgt">42</field>
+                <field name="value">Node 22</field>
+            </row>
+            <row>
+                <field name="id">24</field>
+                <field name="lft">38</field>
+                <field name="rgt">39</field>
+                <field name="value">Node 23</field>
+            </row>
+            <row>
+                <field name="id">25</field>
+                <field name="lft">40</field>
+                <field name="rgt">41</field>
+                <field name="value">Node 24</field>
+            </row>
+            <row>
+                <field name="id">26</field>
+                <field name="lft">43</field>
+                <field name="rgt">48</field>
+                <field name="value">Node 25</field>
+            </row>
+            <row>
+                <field name="id">27</field>
+                <field name="lft">44</field>
+                <field name="rgt">45</field>
+                <field name="value">Node 26</field>
+            </row>
+            <row>
+                <field name="id">28</field>
+                <field name="lft">46</field>
+                <field name="rgt">47</field>
+                <field name="value">Node 27</field>
+            </row>
+            <row>
+                <field name="id">29</field>
+                <field name="lft">49</field>
+                <field name="rgt">54</field>
+                <field name="value">Node 28</field>
+            </row>
+            <row>
+                <field name="id">30</field>
+                <field name="lft">50</field>
+                <field name="rgt">51</field>
+                <field name="value">Node 29</field>
+            </row>
+            <row>
+                <field name="id">31</field>
+                <field name="lft">52</field>
+                <field name="rgt">53</field>
+                <field name="value">Node 30</field>
+            </row>
+            <row>
+                <field name="id">32</field>
+                <field name="lft">56</field>
+                <field name="rgt">75</field>
+                <field name="value">Node 31</field>
+            </row>
+            <row>
+                <field name="id">33</field>
+                <field name="lft">57</field>
+                <field name="rgt">62</field>
+                <field name="value">Node 32</field>
+            </row>
+            <row>
+                <field name="id">34</field>
+                <field name="lft">58</field>
+                <field name="rgt">59</field>
+                <field name="value">Node 33</field>
+            </row>
+            <row>
+                <field name="id">35</field>
+                <field name="lft">60</field>
+                <field name="rgt">61</field>
+                <field name="value">Node 34</field>
+            </row>
+            <row>
+                <field name="id">36</field>
+                <field name="lft">63</field>
+                <field name="rgt">68</field>
+                <field name="value">Node 35</field>
+            </row>
+            <row>
+                <field name="id">37</field>
+                <field name="lft">64</field>
+                <field name="rgt">65</field>
+                <field name="value">Node 36</field>
+            </row>
+            <row>
+                <field name="id">38</field>
+                <field name="lft">66</field>
+                <field name="rgt">67</field>
+                <field name="value">Node 37</field>
+            </row>
+            <row>
+                <field name="id">39</field>
+                <field name="lft">69</field>
+                <field name="rgt">74</field>
+                <field name="value">Node 38</field>
+            </row>
+            <row>
+                <field name="id">40</field>
+                <field name="lft">70</field>
+                <field name="rgt">71</field>
+                <field name="value">Node 39</field>
+            </row>
+            <row>
+                <field name="id">41</field>
+                <field name="lft">72</field>
+                <field name="rgt">73</field>
+                <field name="value">Node 40</field>
+            </row>
+            <row>
+                <field name="id">42</field>
+                <field name="lft">76</field>
+                <field name="rgt">77</field>
+                <field name="value">Node 41</field>
+            </row>
+            <row>
+                <field name="id">43</field>
+                <field name="lft">78</field>
+                <field name="rgt">79</field>
+                <field name="value">Node 42</field>
+            </row>
+            <row>
+                <field name="id">44</field>
+                <field name="lft">80</field>
+                <field name="rgt">81</field>
+                <field name="value">Node 43</field>
+            </row>
+        </table_data>
+    </database>
+</mysqldump>

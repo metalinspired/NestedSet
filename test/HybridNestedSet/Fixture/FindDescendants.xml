@@ -1,0 +1,88 @@
+<?xml version="1.0"?>
+<mysqldump xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <database name="test">
+        <table_data name="hybrid_nested_set">
+            <row>
+                <field name="id">13</field>
+                <field name="lft">23</field>
+                <field name="rgt">28</field>
+                <field name="parent">12</field>
+                <field name="ordering">1</field>
+                <field name="depth">2</field>
+                <field name="value">Node 12</field>
+            </row>
+            <row>
+                <field name="id">14</field>
+                <field name="lft">24</field>
+                <field name="rgt">25</field>
+                <field name="parent">13</field>
+                <field name="ordering">1</field>
+                <field name="depth">3</field>
+                <field name="value">Node 13</field>
+            </row>
+            <row>
+                <field name="id">15</field>
+                <field name="lft">26</field>
+                <field name="rgt">27</field>
+                <field name="parent">13</field>
+                <field name="ordering">2</field>
+                <field name="depth">3</field>
+                <field name="value">Node 14</field>
+            </row>
+            <row>
+                <field name="id">16</field>
+                <field name="lft">29</field>
+                <field name="rgt">34</field>
+                <field name="parent">12</field>
+                <field name="ordering">2</field>
+                <field name="depth">2</field>
+                <field name="value">Node 15</field>
+            </row>
+            <row>
+                <field name="id">17</field>
+                <field name="lft">30</field>
+                <field name="rgt">31</field>
+                <field name="parent">16</field>
+                <field name="ordering">1</field>
+                <field name="depth">3</field>
+                <field name="value">Node 16</field>
+            </row>
+            <row>
+                <field name="id">18</field>
+                <field name="lft">32</field>
+                <field name="rgt">33</field>
+                <field name="parent">16</field>
+                <field name="ordering">2</field>
+                <field name="depth">3</field>
+                <field name="value">Node 17</field>
+            </row>
+            <row>
+                <field name="id">19</field>
+                <field name="lft">35</field>
+                <field name="rgt">40</field>
+                <field name="parent">12</field>
+                <field name="ordering">3</field>
+                <field name="depth">2</field>
+                <field name="value">Node 18</field>
+            </row>
+            <row>
+                <field name="id">20</field>
+                <field name="lft">36</field>
+                <field name="rgt">37</field>
+                <field name="parent">19</field>
+                <field name="ordering">1</field>
+                <field name="depth">3</field>
+                <field name="value">Node 19</field>
+            </row>
+            <row>
+                <field name="id">21</field>
+                <field name="lft">38</field>
+                <field name="rgt">39</field>
+                <field name="parent">19</field>
+                <field name="ordering">2</field>
+                <field name="depth">3</field>
+                <field name="value">Node 20</field>
+            </row>
+        </table_data>
+    </database>
+</mysqldump>

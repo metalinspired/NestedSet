@@ -142,16 +142,11 @@ abstract class AbstractNestedSet
      *
      * @param string $name Id column name
      * @return $this Provides a fluent interface
-     * @throws Exception\InvalidArgumentException
      */
     public function setIdColumn($name)
     {
-        if (!is_string($name) || empty($name)) {
-            throw new Exception\InvalidArgumentException("Invalid column name");
-        }
-
+        $this->idColumn = $this->checkColumnName($name);
         $this->statements = [];
-        $this->idColumn = $name;
 
         return $this;
     }
@@ -171,16 +166,11 @@ abstract class AbstractNestedSet
      *
      * @param string $name
      * @return $this Provides a fluent interface
-     * @throws Exception\InvalidArgumentException
      */
     public function setLeftColumn($name)
     {
-        if (!is_string($name) || empty($name)) {
-            throw new Exception\InvalidArgumentException("Invalid column name");
-        }
-
+        $this->leftColumn = $this->checkColumnName($name);
         $this->statements = [];
-        $this->leftColumn = $name;
 
         return $this;
     }
@@ -200,16 +190,11 @@ abstract class AbstractNestedSet
      *
      * @param string $name
      * @return $this Provides a fluent interface
-     * @throws Exception\InvalidArgumentException
      */
     public function setRightColumn($name)
     {
-        if (!is_string($name) || empty($name)) {
-            throw new Exception\InvalidArgumentException("Invalid column name");
-        }
-
+        $this->rightColumn = $this->checkColumnName($name);
         $this->statements = [];
-        $this->rightColumn = $name;
 
         return $this;
     }
@@ -303,6 +288,22 @@ abstract class AbstractNestedSet
         }
 
         $this->rootNodeId = (int)$result->current()[$this->idColumn];
+    }
+
+    /**
+     * Checks if column name is valid
+     *
+     * @param string $name
+     * @return string
+     * @throws Exception\InvalidColumnNameException
+     */
+    protected function checkColumnName($name)
+    {
+        if (!is_string($name) || empty($name)) {
+            throw new Exception\InvalidColumnNameException();
+        }
+
+        return $name;
     }
 
     /**

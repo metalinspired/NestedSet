@@ -1,0 +1,9 @@
+<?xml version="1.0" ?>
+<dataset>
+    <table name="nested_set">
+        <column>id</column>
+        <column>lft</column>
+        <column>rgt</column>
+        <column>value</column>
+    </table>
+</dataset>

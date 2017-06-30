@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<mysqldump xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <database name="test">
+        <table_data name="nested_set">
+            <row>
+                <field name="new_lft">69</field>
+                <field name="rgt">74</field>
+                <field name="text">Node 35</field>
+            </row>
+            <row>
+                <field name="new_lft">62</field>
+                <field name="rgt">81</field>
+                <field name="text">Node 31</field>
+            </row>
+        </table_data>
+    </database>
+</mysqldump>

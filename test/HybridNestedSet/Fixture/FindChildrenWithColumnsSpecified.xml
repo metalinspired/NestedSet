@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<mysqldump xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <database name="test">
+        <table_data name="hybrid_nested_set">
+            <row>
+                <field name="new_lft">23</field>
+                <field name="rgt">28</field>
+                <field name="text">Node 12</field>
+                <field name="new_order">1</field>
+            </row>
+            <row>
+                <field name="new_lft">29</field>
+                <field name="rgt">34</field>
+                <field name="text">Node 15</field>
+                <field name="new_order">2</field>
+            </row>
+            <row>
+                <field name="new_lft">35</field>
+                <field name="rgt">40</field>
+                <field name="text">Node 18</field>
+                <field name="new_order">3</field>
+            </row>
+        </table_data>
+    </database>
+</mysqldump>

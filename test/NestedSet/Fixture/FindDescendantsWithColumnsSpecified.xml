@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+<mysqldump xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <database name="test">
+        <table_data name="nested_set">
+            <row>
+                <field name="depth">1</field>
+                <field name="new_lft">23</field>
+                <field name="rgt">28</field>
+                <field name="text">Node 12</field>
+            </row>
+            <row>
+                <field name="depth">2</field>
+                <field name="new_lft">24</field>
+                <field name="rgt">25</field>
+                <field name="text">Node 13</field>
+            </row>
+            <row>
+                <field name="depth">2</field>
+                <field name="new_lft">26</field>
+                <field name="rgt">27</field>
+                <field name="text">Node 14</field>
+            </row>
+            <row>
+                <field name="depth">1</field>
+                <field name="new_lft">29</field>
+                <field name="rgt">34</field>
+                <field name="text">Node 15</field>
+            </row>
+            <row>
+                <field name="depth">2</field>
+                <field name="new_lft">30</field>
+                <field name="rgt">31</field>
+                <field name="text">Node 16</field>
+            </row>
+            <row>
+                <field name="depth">2</field>
+                <field name="new_lft">32</field>
+                <field name="rgt">33</field>
+                <field name="text">Node 17</field>
+            </row>
+            <row>
+                <field name="depth">1</field>
+                <field name="new_lft">35</field>
+                <field name="rgt">40</field>
+                <field name="text">Node 18</field>
+            </row>
+            <row>
+                <field name="depth">2</field>
+                <field name="new_lft">36</field>
+                <field name="rgt">37</field>
+                <field name="text">Node 19</field>
+            </row>
+            <row>
+                <field name="depth">2</field>
+                <field name="new_lft">38</field>
+                <field name="rgt">39</field>
+                <field name="text">Node 20</field>
+            </row>
+        </table_data>
+    </database>
+</mysqldump>

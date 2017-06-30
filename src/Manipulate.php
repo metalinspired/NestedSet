@@ -139,13 +139,16 @@ class Manipulate extends AbstractNestedSet
                 break;
             case self::MOVE_MAKE_CHILD:
                 $destination = (int)$result->current()['rgt'] - 1;
+                break;
+            default:
+                throw new Exception\RuntimeException('Unknown position');
         }
 
         /*
          * Check if node is being set as its own child
          */
         if ($destination >= $sourceLeft && $destination < $sourceRight) {
-            throw new Exception\NodeIsOwnChildException();
+            throw new Exception\NodeChildOrSiblingToItself();
         }
 
         /*
@@ -157,7 +160,6 @@ class Manipulate extends AbstractNestedSet
             $destination = $sourceRight;
             $sourceLeft -= $movementSize;
             $sourceRight -= $nodeSize;
-
         }
 
         /*
@@ -174,9 +176,9 @@ class Manipulate extends AbstractNestedSet
          * Move nodes
          */
         if (!array_key_exists('move', $this->statements)) {
-            $moveStatement = new Update($this->table);
+            $update = new Update($this->table);
 
-            $moveStatement
+            $update
                 ->set([
                     $this->leftColumn => new Expression(
                         '(CASE ' .
@@ -219,25 +221,28 @@ class Manipulate extends AbstractNestedSet
                     new Expression(':to2')
                 );
 
-            $this->statements['move'] = $this->sql->prepareStatementForSqlObject($moveStatement);
+            $this->statements['move'] = $this->sql->prepareStatementForSqlObject($update);
         }
 
         /** @var StatementInterface $moveStatement */
         $moveStatement = $this->statements['move'];
 
         $result = $moveStatement->execute([
+            // Left
             ':increase1start' => $sourceLeft,
             ':increase1end' => $sourceRight,
             ':increase1' => $movementSize,
             ':decrease1start' => $sourceRight + 1,
             ':decrease1end' => $sourceRight + $movementSize,
             ':decrease1' => $nodeSize,
+            // Right
             ':increase2start' => $sourceLeft,
             ':increase2end' => $sourceRight,
             ':increase2' => $movementSize,
             ':decrease2start' => $sourceRight + 1,
             ':decrease2end' => $sourceRight + $movementSize,
             ':decrease2' => $nodeSize,
+            // Where
             ':from1' => $sourceLeft,
             ':to1' => $destination + 1,
             ':from2' => $sourceLeft,
@@ -401,6 +406,13 @@ class Manipulate extends AbstractNestedSet
          */
         if ($this->getRootNodeId() == $source) {
             throw new Exception\RuntimeException('Root node can\'t be moved');
+        }
+
+        /*
+         * Bail early if source and destination are same
+         */
+        if ($source == $destination) {
+            return 0;
         }
 
         if (!is_int($source) && !is_string($source)) {

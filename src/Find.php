@@ -171,7 +171,10 @@ class Find extends AbstractNestedSet
                 'rgt' => $this->rightColumn
             ], false)
             ->where
-            ->equalTo($this->idColumn, new Expression(':id'));
+            ->equalTo(
+                $this->idColumn,
+                new Expression(':id')
+            );
 
         $select = new Select(['q' => $subSelect]);
 
@@ -198,14 +201,7 @@ class Find extends AbstractNestedSet
                 $joinOn,
                 $this->columns
             )
-            ->order(
-                new Expression(
-                    '? DESC',
-                    [
-                        ["t.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER]
-                    ]
-                )
-            );
+            ->order("t.{$this->leftColumn} DESC");
 
         if ($depthLimit || $this->depthLimit) {
             $depthLimit = $depthLimit ? $depthLimit : $this->depthLimit;
@@ -236,34 +232,15 @@ class Find extends AbstractNestedSet
             ->columns([])
             ->join(
                 ['parent' => $this->table],
-                new Expression(
-                    '? >= ? AND ? < ?',
-                    [
-                        ["parent.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER],
-                        ["head_parent.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER],
-                        ["parent.{$this->rightColumn}" => Expression::TYPE_IDENTIFIER],
-                        ["head_parent.{$this->rightColumn}" => Expression::TYPE_IDENTIFIER]
-                    ]
-                ),
+                "parent.{$this->leftColumn} >= head_parent.{$this->leftColumn} " .
+                "AND parent.{$this->rightColumn} < head_parent.{$this->rightColumn}",
                 []
             )
             ->join(
                 ['child' => $this->table],
-                new Expression(
-                    '? BETWEEN ? AND ?',
-                    [
-                        ["child.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER],
-                        ["parent.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER],
-                        ["parent.{$this->rightColumn}" => Expression::TYPE_IDENTIFIER]
-                    ]
-                ),
+                "child.{$this->leftColumn} BETWEEN parent.{$this->leftColumn} AND parent.{$this->rightColumn}",
                 [
-                    'id' => new Expression(
-                        '?',
-                        [
-                            ["child.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
-                        ]
-                    ),
+                    'id' => $this->idColumn,
                     'depth' => new Expression(
                         '(CASE WHEN ? = :childDepthId THEN 0 ELSE COUNT(*) END)',
                         [
@@ -272,14 +249,7 @@ class Find extends AbstractNestedSet
                     )
                 ]
             )
-            ->group(
-                new Expression(
-                    '?',
-                    [
-                        ["child.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
-                    ]
-                )
-            );
+            ->group("child.{$this->idColumn}");
 
         $subSelect->having
             ->greaterThanOrEqualTo(new Expression('COUNT(*)'), 1);
@@ -292,21 +262,11 @@ class Find extends AbstractNestedSet
 
         $subSelect->where
             ->equalTo(
-                new Expression(
-                    '?',
-                    [
-                        ["head_parent.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
-                    ]
-                ),
+                "head_parent.{$this->idColumn}",
                 new Expression(':id')
             )
             ->greaterThan(
-                new Expression(
-                    '?',
-                    [
-                        ["parent.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
-                    ]
-                ),
+                "parent.{$this->idColumn}",
                 $this->getRootNodeId()
             );
 
@@ -315,13 +275,9 @@ class Find extends AbstractNestedSet
                 ->where
                 ->or
                 ->equalTo(
-                    new Expression(
-                        '?',
-                        [
-                            ["child.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
-                        ]
-                    ),
-                    new Expression(':searchNodeId'));
+                    "child.{$this->idColumn}",
+                    new Expression(':searchNodeId')
+                );
         }
 
         $select = new Select(['q' => $subSelect]);
@@ -330,16 +286,11 @@ class Find extends AbstractNestedSet
             ->columns(['depth'])
             ->join(
                 ['t' => $this->table],
-                new Expression(
-                    '? = ?',
-                    [
-                        ["t.{$this->idColumn}" => Expression::TYPE_IDENTIFIER],
-                        ["q.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
-                    ]
-                ),
+                "t.{$this->idColumn} = q.{$this->idColumn}",
                 $this->columns
             )
-            ->order(new Expression(
+            ->order(
+                new Expression(
                     '? ASC',
                     [
                         ["t.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER]
@@ -362,6 +313,8 @@ class Find extends AbstractNestedSet
      */
     protected function getFindChildQuery($last = false)
     {
+        $column = $last ? $this->rightColumn : $this->leftColumn;
+
         $select = new Select(['t' => $this->table]);
 
         $select
@@ -376,62 +329,28 @@ class Find extends AbstractNestedSet
                 ),
                 []
             )
-            ->order(
+            ->order("t.{$this->leftColumn}")
+            ->where
+            ->equalTo(
+                "t.{$column}",
                 new Expression(
-                    '?',
+                    '? ' . ($last ? '-' : '+') . ' 1',
                     [
-                        ["q.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER]
+                        ["q.{$column}" => Expression::TYPE_IDENTIFIER]
                     ]
                 )
-            )
-            ->where
-            ->greaterThan(
-                new Expression(
-                    '?',
-                    [
-                        ["t.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
-                    ]
-                ),
-                $this->getRootNodeId()
             );
 
-        $predicate = new Predicate();
-
-        $column = $last ? $this->rightColumn : $this->leftColumn;
-
-        $predicate->equalTo(
-            new Expression(
-                '?',
-                [
-                    ["t.{$column}" => Expression::TYPE_IDENTIFIER]
-                ]
-            ),
-            new Expression(
-                '?' . ($last ? '-' : '+') . '1',
-                [
-                    ["q.{$column}" => Expression::TYPE_IDENTIFIER]
-                ]
-            )
-        );
-
         if ($this->includeSearchingNode) {
-            $predicate
+            $select
+                ->where
                 ->or
                 ->equalTo(
-                    new Expression(
-                        '?',
-                        [
-                            ["t.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
-                        ]
-                    ),
-                    new Expression(':includeId')
+                    "t.{$this->idColumn}",
+                    new Expression(':sId')
                 );
         }
 
-        $select
-            ->where
-            ->nest()
-            ->addPredicate($predicate);
 
         return $select;
     }
@@ -460,43 +379,20 @@ class Find extends AbstractNestedSet
                 ),
                 []
             )
-            ->order(
-                new Expression(
-                    '? DESC',
-                    [
-                        ["parent.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER]
-                    ]
-                )
-            )
+            ->order("parent.{$this->leftColumn} DESC")
             ->limit(1)
             ->where
             ->greaterThan(
-                new Expression(
-                    '?',
-                    [
-                        ["node.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER]
-                    ]
-                ),
-                new Expression(
-                    '?',
-                    [
-                        ["parent.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER]
-                    ]
-                )
+                "node.{$this->leftColumn}",
+                "parent.{$this->leftColumn}",
+                Predicate::TYPE_IDENTIFIER,
+                Predicate::TYPE_IDENTIFIER
             )
             ->lessThan(
-                new Expression(
-                    '?',
-                    [
-                        ["node.{$this->rightColumn}" => Expression::TYPE_IDENTIFIER]
-                    ]
-                ),
-                new Expression(
-                    '?',
-                    [
-                        ["parent.{$this->rightColumn}" => Expression::TYPE_IDENTIFIER]
-                    ]
-                )
+                "node.{$this->rightColumn}",
+                "parent.{$this->rightColumn}",
+                Predicate::TYPE_IDENTIFIER,
+                Predicate::TYPE_IDENTIFIER
             );
 
         $subSelect = new Select(['head_parent' => $subSelectSelect]);
@@ -505,37 +401,16 @@ class Find extends AbstractNestedSet
             ->columns([])
             ->join(
                 ['parent' => $this->table],
-                new Expression(
-                    '? >= ? AND ? < ?',
-                    [
-                        ["parent.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER],
-                        ["head_parent.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER],
-                        ["parent.{$this->rightColumn}" => Expression::TYPE_IDENTIFIER],
-                        ["head_parent.{$this->rightColumn}" => Expression::TYPE_IDENTIFIER]
-                    ]
-                ),
+                "parent.{$this->leftColumn} >= head_parent.{$this->leftColumn} " .
+                "AND parent.{$this->rightColumn} < head_parent.{$this->rightColumn}",
                 []
             )
             ->join(
                 ['child' => $this->table],
-                new Expression(
-                    '? BETWEEN ? AND ?',
-                    [
-                        ["child.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER],
-                        ["parent.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER],
-                        ["parent.{$this->rightColumn}" => Expression::TYPE_IDENTIFIER]
-                    ]
-                ),
+                "child.{$this->leftColumn} BETWEEN parent.{$this->leftColumn} AND parent.{$this->rightColumn}",
                 [$this->idColumn]
             )
-            ->group(
-                new Expression(
-                    '?',
-                    [
-                        ["child.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
-                    ]
-                )
-            );
+            ->group("child.{$this->idColumn}");
 
         $subSelect
             ->having
@@ -548,12 +423,7 @@ class Find extends AbstractNestedSet
             $subSelect
                 ->where
                 ->notEqualTo(
-                    new Expression(
-                        '?',
-                        [
-                            ["child.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
-                        ]
-                    ),
+                    "child.{$this->idColumn}",
                     new Expression(':childId')
                 );
         }
@@ -564,23 +434,10 @@ class Find extends AbstractNestedSet
             ->columns([])
             ->join(
                 ['t' => $this->table],
-                new Expression(
-                    '? = ?',
-                    [
-                        ["t.{$this->idColumn}" => Expression::TYPE_IDENTIFIER],
-                        ["q.{$this->idColumn}" => Expression::TYPE_IDENTIFIER],
-                    ]
-                ),
+                "t.{$this->idColumn} = q.{$this->idColumn}",
                 $this->columns
             )
-            ->order(
-                new Expression(
-                    '? ASC',
-                    [
-                        ["t.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER]
-                    ]
-                )
-            );
+            ->order("t.{$this->leftColumn} ASC");
 
         return $select;
     }
@@ -607,23 +464,11 @@ class Find extends AbstractNestedSet
                 ),
                 []
             )
-            ->order(
-                new Expression(
-                    '? ' . ($previous ? 'DESC' : 'ASC'),
-                    [
-                        ["t.{$this->leftColumn}" => Expression::TYPE_IDENTIFIER]
-                    ]
-                )
-            )
+            ->order("t.{$this->leftColumn} " . ($previous ? 'DESC' : 'ASC'))
             ->where
             ->greaterThan(
-                new Expression(
-                    '?',
-                    [
-                        ["t.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
-                    ]
-                ),
-                $this->getRootNodeId()
+                "t.{$this->idColumn}",
+                5
             );
 
         $predicate = new Predicate();
@@ -632,12 +477,7 @@ class Find extends AbstractNestedSet
         $column2 = $previous ? $this->leftColumn : $this->rightColumn;
 
         $predicate->equalTo(
-            new Expression(
-                '?',
-                [
-                    ["t.{$column1}" => Expression::TYPE_IDENTIFIER]
-                ]
-            ),
+            "t.{$column1}",
             new Expression(
                 '? ' . ($previous ? '-' : '+') . ' 1',
                 [
@@ -650,12 +490,7 @@ class Find extends AbstractNestedSet
             $predicate
                 ->or
                 ->equalTo(
-                    new Expression(
-                        '?',
-                        [
-                            ["t.{$this->idColumn}" => Expression::TYPE_IDENTIFIER]
-                        ]
-                    ),
+                    "t.{$this->idColumn}",
                     new Expression(':includeId')
                 );
         }
@@ -811,7 +646,7 @@ class Find extends AbstractNestedSet
         $parameters = [':id' => $id];
 
         if ($this->includeSearchingNode) {
-            $parameters[':includeId'] = $id;
+            $parameters[':sId'] = $id;
         }
 
         /** @var StatementInterface $statement */
@@ -842,7 +677,7 @@ class Find extends AbstractNestedSet
         $parameters = [':id' => $id];
 
         if ($this->includeSearchingNode) {
-            $parameters[':includeId'] = $id;
+            $parameters[':sId'] = $id;
         }
 
         /** @var StatementInterface $statement */
