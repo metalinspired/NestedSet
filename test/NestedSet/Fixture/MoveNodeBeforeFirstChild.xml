@@ -34,20 +34,20 @@
             </row>
             <row>
                 <field name="id">6</field>
-                <field name="lft">46</field>
-                <field name="rgt">51</field>
+                <field name="lft">44</field>
+                <field name="rgt">49</field>
                 <field name="value">Node 5</field>
             </row>
             <row>
                 <field name="id">7</field>
-                <field name="lft">47</field>
-                <field name="rgt">48</field>
+                <field name="lft">45</field>
+                <field name="rgt">46</field>
                 <field name="value">Node 6</field>
             </row>
             <row>
                 <field name="id">8</field>
-                <field name="lft">49</field>
-                <field name="rgt">50</field>
+                <field name="lft">47</field>
+                <field name="rgt">48</field>
                 <field name="value">Node 7</field>
             </row>
             <row>
@@ -160,8 +160,8 @@
             </row>
             <row>
                 <field name="id">27</field>
-                <field name="lft">44</field>
-                <field name="rgt">45</field>
+                <field name="lft">50</field>
+                <field name="rgt">51</field>
                 <field name="value">Node 26</field>
             </row>
             <row>

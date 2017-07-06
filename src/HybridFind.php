@@ -2,6 +2,9 @@
 
 namespace metalinspired\NestedSet;
 
+use metalinspired\NestedSet\Exception\InvalidNodeIdentifierException;
+use metalinspired\NestedSet\Exception\UnknownDbException;
+use Zend\Db\Adapter\Driver\ResultInterface;
 use Zend\Db\Adapter\Driver\StatementInterface;
 use Zend\Db\Sql\Expression;
 use Zend\Db\Sql\Select;
@@ -12,11 +15,11 @@ class HybridFind extends Find
 
     public function findDescendants($id)
     {
-        if (!is_int($id) && !is_string($id)) {
-            throw new Exception\InvalidNodeIdentifierException($id);
+        if (! is_int($id) && ! is_string($id)) {
+            throw new InvalidNodeIdentifierException($id);
         }
 
-        if (!array_key_exists('hybrid_find_descendants', $this->statements)) {
+        if (! array_key_exists('hybrid_find_descendants', $this->statements)) {
             $select = new Select(['t' => $this->table]);
 
             $select
@@ -63,16 +66,22 @@ class HybridFind extends Find
             $parameters[':depth'] = $this->depthLimit;
         }
 
-        return $statement->execute($parameters);
+        $result = $statement->execute($parameters);
+
+        if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+            throw new UnknownDbException();
+        }
+
+        return $result;
     }
 
     public function findChildren($id)
     {
-        if (!is_int($id) && !is_string($id)) {
-            throw new Exception\InvalidNodeIdentifierException($id);
+        if (! is_int($id) && ! is_string($id)) {
+            throw new InvalidNodeIdentifierException($id);
         }
 
-        if (!array_key_exists('hybrid_find_children', $this->statements)) {
+        if (! array_key_exists('hybrid_find_children', $this->statements)) {
             $select = new Select($this->table);
 
             $select
@@ -106,16 +115,22 @@ class HybridFind extends Find
             $parameters[':sId'] = $id;
         }
 
-        return $statement->execute($parameters);
+        $result = $statement->execute($parameters);
+
+        if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+            throw new UnknownDbException();
+        }
+
+        return $result;
     }
 
     public function findParent($id)
     {
-        if (!is_int($id) && !is_string($id)) {
-            throw new Exception\InvalidNodeIdentifierException($id);
+        if (! is_int($id) && ! is_string($id)) {
+            throw new InvalidNodeIdentifierException($id);
         }
 
-        if (!array_key_exists('hybrid_find_parent', $this->statements)) {
+        if (! array_key_exists('hybrid_find_parent', $this->statements)) {
             $select = new Select(['t' => $this->table]);
 
             $select
@@ -145,16 +160,22 @@ class HybridFind extends Find
 
         $parameters = [':id' => $id];
 
-        return $statement->execute($parameters);
+        $result = $statement->execute($parameters);
+
+        if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+            throw new UnknownDbException();
+        }
+
+        return $result;
     }
 
     public function findSiblings($id)
     {
-        if (!is_int($id) && !is_string($id)) {
-            throw new Exception\InvalidNodeIdentifierException($id);
+        if (! is_int($id) && ! is_string($id)) {
+            throw new InvalidNodeIdentifierException($id);
         }
 
-        if (!array_key_exists('hybrid_find_sibling', $this->statements)) {
+        if (! array_key_exists('hybrid_find_sibling', $this->statements)) {
             $select = new Select(['t' => $this->table]);
 
             $select
@@ -169,7 +190,7 @@ class HybridFind extends Find
                             ->group('id')
                     ],
                     "q.parent = t.{$this->parentColumn}" .
-                    (!$this->includeSearchingNode ? " AND q.{$this->idColumn} <> t.{$this->idColumn}" : ''),
+                    (! $this->includeSearchingNode ? " AND q.{$this->idColumn} <> t.{$this->idColumn}" : ''),
                     []
                 )
                 ->order("t.{$this->leftColumn}")
@@ -187,6 +208,12 @@ class HybridFind extends Find
 
         $parameters = [':id' => $id];
 
-        return $statement->execute($parameters);
+        $result = $statement->execute($parameters);
+
+        if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+            throw new UnknownDbException();
+        }
+
+        return $result;
     }
 }

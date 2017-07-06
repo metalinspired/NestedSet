@@ -11,7 +11,7 @@
             <row>
                 <field name="id">2</field>
                 <field name="lft">2</field>
-                <field name="rgt">23</field>
+                <field name="rgt">27</field>
                 <field name="value">Node 1</field>
             </row>
             <row>
@@ -70,44 +70,44 @@
             </row>
             <row>
                 <field name="id">12</field>
-                <field name="lft">24</field>
+                <field name="lft">28</field>
                 <field name="rgt">41</field>
                 <field name="value">Node 11</field>
             </row>
             <row>
                 <field name="id">13</field>
-                <field name="lft">25</field>
-                <field name="rgt">30</field>
+                <field name="lft">29</field>
+                <field name="rgt">34</field>
                 <field name="value">Node 12</field>
             </row>
             <row>
                 <field name="id">14</field>
-                <field name="lft">26</field>
-                <field name="rgt">27</field>
+                <field name="lft">30</field>
+                <field name="rgt">31</field>
                 <field name="value">Node 13</field>
             </row>
             <row>
                 <field name="id">15</field>
-                <field name="lft">28</field>
-                <field name="rgt">29</field>
+                <field name="lft">32</field>
+                <field name="rgt">33</field>
                 <field name="value">Node 14</field>
             </row>
             <row>
                 <field name="id">16</field>
-                <field name="lft">31</field>
-                <field name="rgt">34</field>
+                <field name="lft">21</field>
+                <field name="rgt">26</field>
                 <field name="value">Node 15</field>
             </row>
             <row>
                 <field name="id">17</field>
-                <field name="lft">32</field>
-                <field name="rgt">33</field>
+                <field name="lft">22</field>
+                <field name="rgt">23</field>
                 <field name="value">Node 16</field>
             </row>
             <row>
                 <field name="id">18</field>
-                <field name="lft">21</field>
-                <field name="rgt">22</field>
+                <field name="lft">24</field>
+                <field name="rgt">25</field>
                 <field name="value">Node 17</field>
             </row>
             <row>

@@ -9,12 +9,13 @@
         <var name="DB_USER" value=""/>
         <var name="DB_PASSWORD" value=""/>
         <var name="DB_NAME" value="test"/>
-        <var name="DB_TABLE" value="nested-set"/>
+        <var name="DB_TABLE" value="nested_set"/>
+        <var name="DB_HYBRID_TABLE" value="hybrid_nested_set"/>
     </php>
 
     <testsuites>
         <testsuite name="NestedSet Test Suite">
-            <directory>./test/</directory>
+            <directory suffix="Test.php">./test/*</directory>
         </testsuite>
     </testsuites>
 </phpunit>

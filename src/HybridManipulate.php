@@ -2,7 +2,6 @@
 
 namespace metalinspired\NestedSet;
 
-use metalinspired\NestedSet\Exception\RuntimeException;
 use metalinspired\NestedSet\Exception\UnknownDbException;
 use Zend\Db\Adapter\Driver\ResultInterface;
 use Zend\Db\Adapter\Driver\StatementInterface;
@@ -12,10 +11,9 @@ use Zend\Db\Sql\Insert;
 use Zend\Db\Sql\Select;
 use Zend\Db\Sql\Update;
 
-class HybridManipulate extends AbstractNestedSet
+class HybridManipulate extends Manipulate
 {
-    use HybridNestedSetTrait,
-        CreateInsertGapTrait;
+    use HybridNestedSetTrait;
 
     /**
      * Constants for move method
@@ -25,152 +23,64 @@ class HybridManipulate extends AbstractNestedSet
         MOVE_MAKE_CHILD = 'make_child';
 
     /**
-     * @param array $identifiers
-     * @return ResultInterface
+     * {@inheritdoc}
      */
-    protected function getCommonColumns(array $identifiers)
+    protected function getCommonColumns()
     {
-        //TODO: make a version when only one id is requested cacheable ?!?
-
-        $select = new Select($this->table);
-        $select
-            ->columns([
-                'id' => $this->idColumn,
-                'lft' => $this->leftColumn,
-                'rgt' => $this->rightColumn,
-                'parent' => $this->parentColumn,
-                'ordering' => $this->orderingColumn,
-                'depth' => $this->depthColumn
-            ])
-            ->order($this->leftColumn . ' ASC')
-            ->where
-            ->in(
-                $this->idColumn,
-                $identifiers
-            );
-
-        return $this->sql->prepareStatementForSqlObject($select)->execute();
+        return [
+            'id' => $this->idColumn,
+            'lft' => $this->leftColumn,
+            'rgt' => $this->rightColumn,
+            'parent' => $this->parentColumn,
+            'ordering' => $this->orderingColumn,
+            'depth' => $this->depthColumn
+        ];
     }
 
     /**
-     * Checks if nodes are continuous siblings and builds a range to be moved
-     *
-     * @param array $sources            Identifiers of nodes
-     * @param bool  $childrenBreakRange If set to false to make nodes that are children fall within valid range
-     * @return array                    Array whose first element is a range array and, possibly, identifiers of nodes
-     *                                  from sources array who were not direct siblings therefore did not fall
-     *                                  into valid range
+     * {@inheritdoc}
      */
-    protected function sourcesToRange($sources, $childrenBreakRange = true)
+    protected function findChildren(array $parents)
     {
-        if (!is_array($sources)) {
-            $sources = [$sources];
+        $select = new Select($this->table);
+        $select
+            ->columns([
+                'id' => $this->idColumn
+            ])
+            ->where
+            ->in(
+                $this->parentColumn,
+                $parents
+            );
+
+        $result = $this->sql->prepareStatementForSqlObject($select)->execute();
+
+        if (! $result instanceof ResultInterface && ! $result->isQueryResult()) {
+            throw new UnknownDbException();
         }
 
-        /*
-         * Get nodes and relevant data
-         */
-        $nodes = $this->getCommonColumns($sources);
+        $children = [];
 
-        /*
-         * Identifier of nodes that didn't fall within range of continuous nodes
-         * Used to filter non existing nodes
-         */
-        $idsOutOfRange = [];
-
-        /*
-         * Range that is to be moved
-         */
-        $range = null;
-
-        /*
-         * Trigger for changing behavior when looping through nodes
-         */
-        $rangeComplete = false;
-
-        /*
-         * Right value of previous node
-         */
-        $right = null;
-
-        /*
-         * Check if nodes are continuous siblings
-         */
-        while ($node = $nodes->current()) {
-            $node = $this->arrayValuesToInt($node);
-
-            /*
-             * Remove node from sources array
-             */
-            unset($sources[array_search($node['id'], $sources)]);
-
-            if (!$rangeComplete) {
-                if ($right && (
-                        $right < $node['rgt'] && !$childrenBreakRange
-                        || $node['lft'] !== $right + 1 && $childrenBreakRange
-                    )
-                ) {
-                    $rangeComplete = true;
-                    $idsOutOfRange[] = $node['id'];
-                    $nodes->next();
-                    continue;
-                }
-                if (!$range) {
-                    $range = $node;
-                    $range['count'] = 0;
-                    $range['last_id'] = $node['id'];
-                }
-                if ($node['rgt'] > $right) {
-                    $range['rgt'] = $node['rgt'];
-                    $range['last_id'] = $node['id'];
-                    $range['count']++;
-                    $right = $node['rgt'];
-                }
-            } else {
-                $idsOutOfRange[] = $node['id'];
-            }
-
-            /*
-             * Advance to next node
-             */
-            $nodes->next();
+        foreach ($result as $node) {
+            $children[] = $node['id'];
         }
 
-        /*
-         * If sources array is not empty than it contains non-existing node identifier
-         */
-        if (!empty($sources)) {
-            throw new RuntimeException(sprintf(
-                'Node %s could not be found',
-                reset($sources)
-            ));
-        }
-        /*
-         * Create a array composed of valid range as first element and
-         * identifiers of nodes who do not fall within computed range
-         */
-        $range = array_merge([$range], $idsOutOfRange);
-
-        return $range;
+        return $children;
     }
 
-    protected function arrayValuesToInt(array $array)
-    {
-        foreach ($array as &$value) {
-            $value = (int)$value;
-        }
-
-        return $array;
-    }
-
+    /**
+     * {@inheritdoc}
+     */
     protected function moveRange($sourceRange, $destination, $position = self::MOVE_AFTER)
     {
-        //TODO: insert checks
-
         /*
          * Get destination node
          */
-        $destinationNode = $this->getCommonColumns([':id' => $destination]);
+        $destinationNode = $this->findNodes([':id' => $destination]);
+
+        if (! $destinationNode instanceof ResultInterface || ! $destinationNode->isQueryResult()) {
+            throw new UnknownDbException();
+        }
 
         if (1 !== $destinationNode->getAffectedRows()) {
             throw new Exception\RuntimeException(sprintf(
@@ -189,40 +99,43 @@ class HybridManipulate extends AbstractNestedSet
         if ($position === self::MOVE_MAKE_CHILD) {
             $destinationParent = $destinationNode;
 
-            // TODO: put in cache
-            $destinationNode = new Select($this->table);
+            if (! array_key_exists('hybrid_move_', $this->statements)) {
+                $select = new Select($this->table);
 
-            $destinationNode
-                ->columns([
-                    'lft' => $this->leftColumn,
-                    'rgt' => $this->rightColumn,
-                    'ordering' => $this->orderingColumn,
-                    'parent' => $this->parentColumn,
-                    'depth' => $this->depthColumn
-                ])
-                ->where
-                ->equalTo(
-                    $this->rightColumn,
-                    $destinationParent['rgt'] - 1
-                );
+                $select
+                    ->columns($this->getCommonColumns())
+                    ->where
+                    ->equalTo(
+                        $this->rightColumn,
+                        new Expression(':childLeft')
+                    );
 
-            $destinationNode = $this->sql->prepareStatementForSqlObject($destinationNode)->execute();
+                $this->statements['hybrid_move_'] = $this->sql->prepareStatementForSqlObject($select);
+            }
 
-            // TODO: maybe check it there were multiple nodes found
+            /** @var StatementInterface $destinationNodeStatement */
+            $destinationNodeStatement = $this->statements['hybrid_move_'];
+
+            $result = $destinationNodeStatement->execute([':childLeft' => $destinationParent['rgt'] - 1]);
+
+            if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+                throw new UnknownDbException();
+            }
+
             /*
              * If parent node has no children create artificial destination node
              */
-            if (1 !== $destinationNode->getAffectedRows()) {
+            if (1 !== $result->getAffectedRows()) {
                 $destinationNode = $destinationParent;
                 $destinationNode['parent'] = $destinationNode['id'];
                 $destinationNode['ordering'] = 0;
                 $destinationNode['depth']++;
                 $destinationNode['rgt'] = $destinationNode['lft'];
             } else {
-                $destinationNode = $this->arrayValuesToInt($destinationNode->current());
+                $destinationNode = $this->arrayValuesToInt($result->current());
             }
         } else {
-            $destinationParent = $this->getCommonColumns([':id' => $destinationNode['parent']]);
+            $destinationParent = $this->findNodes([':id' => $destinationNode['parent']]);
 
             if (1 !== $destinationParent->getAffectedRows()) {
                 throw new Exception\RuntimeException(sprintf(
@@ -245,15 +158,15 @@ class HybridManipulate extends AbstractNestedSet
          * Determine exact destination position
          */
         switch ($position) {
-            case self::MOVE_BEFORE:
-                $destinationPosition = $destinationNode['lft'] - 1;
-                break;
+            case self::MOVE_AFTER:
             case self::MOVE_MAKE_CHILD:
                 $destinationPosition = $destinationNode['rgt'];
                 break;
-            // MOVE_AFTER
+            case self::MOVE_BEFORE:
+                $destinationPosition = $destinationNode['lft'] - 1;
+                break;
             default:
-                $destinationPosition = $destinationNode['rgt'];
+                throw new Exception\RuntimeException('Unknown position');
         }
 
         /*
@@ -264,7 +177,7 @@ class HybridManipulate extends AbstractNestedSet
         /*
          * Get source node parent
          */
-        $sourceParent = $this->getCommonColumns([':id' => $sourceRange['parent']]);
+        $sourceParent = $this->findNodes([':id' => $sourceRange['parent']]);
 
         if (1 !== $sourceParent->getAffectedRows()) {
             throw new Exception\RuntimeException(sprintf(
@@ -368,7 +281,7 @@ class HybridManipulate extends AbstractNestedSet
         /*
          * Move nodes
          */
-        if (!array_key_exists('move', $this->statements)) {
+        if (! array_key_exists('hybrid_move', $this->statements)) {
             $update = new Update($this->table);
 
             $update
@@ -460,11 +373,11 @@ class HybridManipulate extends AbstractNestedSet
                     new Expression(':to2')
                 );
 
-            $this->statements['move'] = $this->sql->prepareStatementForSqlObject($update);
+            $this->statements['hybrid_move'] = $this->sql->prepareStatementForSqlObject($update);
         }
 
         /** @var StatementInterface $moveStatement */
-        $moveStatement = $this->statements['move'];
+        $moveStatement = $this->statements['hybrid_move'];
 
         $parameters = [
             // Depth
@@ -514,11 +427,21 @@ class HybridManipulate extends AbstractNestedSet
 
         $result = $moveStatement->execute($parameters);
 
+        if (! $result instanceof ResultInterface) {
+            throw new UnknownDbException();
+        }
+
         return $result->getAffectedRows();
     }
 
+    /**
+     * {@inheritdoc}
+     */
     protected function deleteRange($range)
     {
+        /*
+         * Calculate size of range
+         */
         $size = $range['rgt'] - $range['lft'] + 1;
 
         $parent = new Select($this->table);
@@ -537,83 +460,107 @@ class HybridManipulate extends AbstractNestedSet
             ':id' => $range['parent']
         ];
 
-        $parent = $this->sql->prepareStatementForSqlObject($parent)->execute($parameters);
+        $result = $this->sql->prepareStatementForSqlObject($parent)->execute($parameters);
 
-        if (!$parent instanceof ResultInterface || !$parent->isQueryResult()) {
+        if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
             throw new Exception\UnknownDbException();
         }
 
-        if (1 !== $parent->getAffectedRows()) {
+        if (1 !== $result->getAffectedRows()) {
             throw new Exception\RuntimeException(sprintf(
                 'Parent node of node %s was not found or not unique',
                 $range['id']
             ));
         }
 
-        $parent = $this->arrayValuesToInt($parent->current());
+        $parent = $this->arrayValuesToInt($result->current());
 
-        $delete = new Delete($this->table);
-        $delete
-            ->where
-            ->greaterThanOrEqualTo(
-                $this->leftColumn,
-                new Expression(':from')
-            )
-            ->lessThanOrEqualTo(
-                $this->rightColumn,
-                new Expression(':to')
-            );
+        /*
+         * Delete range
+         */
+        if (! array_key_exists('hybrid_delete_range', $this->statements)) {
+            $delete = new Delete($this->table);
+
+            $delete
+                ->where
+                ->greaterThanOrEqualTo(
+                    $this->leftColumn,
+                    new Expression(':from')
+                )
+                ->lessThanOrEqualTo(
+                    $this->rightColumn,
+                    new Expression(':to')
+                );
+
+            $this->statements['hybrid_delete_range'] = $this->sql->prepareStatementForSqlObject($delete);
+        }
+
+        /** @var StatementInterface $deleteRangeStatement */
+        $deleteRangeStatement = $this->statements['hybrid_delete_range'];
 
         $parameters = [
             ':from' => $range['lft'],
             ':to' => $range['rgt']
         ];
 
-        $count = $this
-            ->sql
-            ->prepareStatementForSqlObject($delete)
-            ->execute($parameters)
-            ->getAffectedRows();
+        $result = $deleteRangeStatement->execute($parameters);
 
-        $update = new Update($this->table);
-        $update
-            ->set([
-                $this->orderingColumn => new Expression(
-                    '(CASE ' .
-                    'WHEN ? BETWEEN :orderingDecreaseStart AND :orderingDecreaseEnd' .
-                    ' AND ? = :orderingParentId THEN ? - :orderingDecreaseSize ' .
-                    'ELSE ? ' .
-                    'END)',
-                    [
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER],
-                        [$this->parentColumn => Expression::TYPE_IDENTIFIER],
-                        [$this->orderingColumn => Expression::TYPE_IDENTIFIER],
-                        [$this->orderingColumn => Expression::TYPE_IDENTIFIER]
-                    ]
-                ),
-                $this->leftColumn => new Expression(
-                    '(CASE ' .
-                    'WHEN ? < :leftDecreaseStart THEN ? ' .
-                    'ELSE ? - :leftDecrease ' .
-                    'END)',
-                    [
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER],
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER],
-                        [$this->leftColumn => Expression::TYPE_IDENTIFIER]
-                    ]
-                ),
-                $this->rightColumn => new Expression(
-                    '? - :rightDecrease',
-                    [
-                        [$this->rightColumn => Expression::TYPE_IDENTIFIER]
-                    ]
-                )
-            ])
-            ->where
-            ->greaterThanOrEqualTo(
-                $this->rightColumn,
-                $range['rgt']
-            );
+        if (! $result instanceof ResultInterface) {
+            throw new UnknownDbException();
+        }
+
+        $count = $result->getAffectedRows();
+
+        /*
+         * Close the gap left after deleting
+         */
+        if (! array_key_exists('hybrid_close_gap', $this->statements)) {
+            $update = new Update($this->table);
+
+            $update
+                ->set([
+                    $this->orderingColumn => new Expression(
+                        '(CASE ' .
+                        'WHEN ? BETWEEN :orderingDecreaseStart AND :orderingDecreaseEnd' .
+                        ' AND ? = :orderingParentId THEN ? - :orderingDecreaseSize ' .
+                        'ELSE ? ' .
+                        'END)',
+                        [
+                            [$this->leftColumn => Expression::TYPE_IDENTIFIER],
+                            [$this->parentColumn => Expression::TYPE_IDENTIFIER],
+                            [$this->orderingColumn => Expression::TYPE_IDENTIFIER],
+                            [$this->orderingColumn => Expression::TYPE_IDENTIFIER]
+                        ]
+                    ),
+                    $this->leftColumn => new Expression(
+                        '(CASE ' .
+                        'WHEN ? < :leftDecreaseStart THEN ? ' .
+                        'ELSE ? - :leftDecrease ' .
+                        'END)',
+                        [
+                            [$this->leftColumn => Expression::TYPE_IDENTIFIER],
+                            [$this->leftColumn => Expression::TYPE_IDENTIFIER],
+                            [$this->leftColumn => Expression::TYPE_IDENTIFIER]
+                        ]
+                    ),
+                    $this->rightColumn => new Expression(
+                        '? - :rightDecrease',
+                        [
+                            [$this->rightColumn => Expression::TYPE_IDENTIFIER]
+                        ]
+                    )
+                ])
+                ->where
+                ->greaterThanOrEqualTo(
+                    $this->rightColumn,
+                    new Expression(':start')
+                );
+
+            $this->statements['hybrid_close_gap'] = $this->sql->prepareStatementForSqlObject($update);
+        }
+
+        /** @var StatementInterface $closeGapStatement */
+        $closeGapStatement = $this->statements['hybrid_close_gap'];
 
         $parameters = [
             ':orderingDecreaseStart' => $range['rgt'],
@@ -622,14 +569,22 @@ class HybridManipulate extends AbstractNestedSet
             ':orderingDecreaseSize' => $range['count'],
             ':leftDecreaseStart' => $range['rgt'],
             ':leftDecrease' => $size,
-            ':rightDecrease' => $size
+            ':rightDecrease' => $size,
+            ':start' => $range['rgt']
         ];
 
-        $this->sql->prepareStatementForSqlObject($update)->execute($parameters);
+        $result = $closeGapStatement->execute($parameters);
+
+        if (! $result instanceof ResultInterface) {
+            throw new UnknownDbException();
+        }
 
         return $count;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function createRootNode()
     {
         $select = new Select($this->table);
@@ -644,6 +599,10 @@ class HybridManipulate extends AbstractNestedSet
         ]);
 
         $result = $this->sql->prepareStatementForSqlObject($select)->execute();
+
+        if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+            throw new UnknownDbException();
+        }
 
         if ($result->current()['count'] != 0) {
             throw new Exception\RuntimeException(
@@ -666,19 +625,26 @@ class HybridManipulate extends AbstractNestedSet
 
         $result = $this->sql->prepareStatementForSqlObject($insert)->execute();
 
+        if (! $result instanceof ResultInterface) {
+            throw new UnknownDbException();
+        }
+
         return $result->getGeneratedValue();
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function insert($parent, array $data = [])
     {
-        if (!is_int($parent) && !is_string($parent)) {
+        if (! is_int($parent) && ! is_string($parent)) {
             throw new Exception\InvalidNodeIdentifierException($parent, 'Parent');
         }
 
         /*
          * Get required parent fields
          */
-        $result = $this->getCommonColumns([$parent]);
+        $result = $this->findNodes([$parent]);
 
         if (0 === $result->getAffectedRows()) {
             throw new Exception\RuntimeException(sprintf(
@@ -692,12 +658,16 @@ class HybridManipulate extends AbstractNestedSet
         /*
          * Create a gap to insert new record
          */
-        $this
-            ->getInsertMethodCreateGapStatement()
-            ->execute([
-                ':newPosition' => $newPosition,
-                ':newPositionWhere' => $newPosition
-            ]);
+        $parameters = [
+            ':newPosition' => $newPosition,
+            ':newPositionWhere' => $newPosition
+        ];
+
+        $result = $this->getInsertMethodCreateGapStatement()->execute($parameters);
+
+        if (! $result instanceof ResultInterface) {
+            throw new UnknownDbException();
+        }
 
         /*
          * Insert new data
@@ -735,152 +705,10 @@ class HybridManipulate extends AbstractNestedSet
 
         $result = $this->sql->prepareStatementForSqlObject($insert)->execute();
 
-        return $result->getGeneratedValue();
-    }
-
-
-    /**
-     * Move node(s)
-     *
-     * @param int|string|array $source      Identifier of source node or array of identifiers
-     * @param int|string       $destination Identifier of destination node
-     * @param string           $position    Move node to before/after destination or make it a child of destination node
-     * @return int                          Number of nodes moved
-     * @throws Exception\RuntimeException
-     */
-    public function move($source, $destination, $position = self::MOVE_AFTER)
-    {
-        /*
-         * Bail early checks when moving single node and source and destination are same
-         */
-        if (!is_array($source) && $source == $destination) {
-            if ($position === self::MOVE_MAKE_CHILD) {
-                throw new Exception\NodeChildOrSiblingToItself();
-            }
-            return 0;
-        }
-
-        $source = $this->sourcesToRange($source);
-
-        $sourceRange = array_shift($source);
-
-        $count = ($sourceRange['rgt'] - $sourceRange['lft'] + 1) / 2;
-
-        $this->moveRange($sourceRange, $destination, $position);
-
-        /*
-         * Check if there is more nodes that need to be moved
-         * but change destination to after last moved node
-         */
-        if (!empty($source)) {
-            $count += $this->move($source, $sourceRange['last_id'], self::MOVE_AFTER);
-        }
-
-        return $count;
-    }
-
-    /**
-     * Move a node after destination node
-     *
-     * @see move()
-     * @param $source
-     * @param $destination
-     * @return int
-     */
-    public function moveAfter($source, $destination)
-    {
-        return $this->move($source, $destination, self::MOVE_AFTER);
-    }
-
-    /**
-     * Move a node before destination node
-     *
-     * @see move()
-     * @param $source
-     * @param $destination
-     * @return int
-     */
-    public function moveBefore($source, $destination)
-    {
-        return $this->move($source, $destination, self::MOVE_BEFORE);
-    }
-
-    /**
-     * Move a node to become a child of destination node
-     *
-     * @see move()
-     * @param $source
-     * @param $destination
-     * @return int
-     */
-    public function moveMakeChild($source, $destination)
-    {
-        return $this->move($source, $destination, self::MOVE_MAKE_CHILD);
-    }
-
-    public function delete($id)
-    {
-        $id = $this->sourcesToRange($id, false);
-
-        $range = array_shift($id);
-
-        /*
-         * Prevent user from deleting root node
-         */
-        if ($this->getRootNodeId() == $range['id']) {
-            throw new Exception\RuntimeException('Root node can\'t be deleted');
-        }
-
-        $count = $this->deleteRange($range);
-
-        if (!empty($id)) {
-            $count += $this->delete($id);
-        }
-
-        return $count;
-    }
-
-    public function clean($parent, $destination = null, $position = self::MOVE_MAKE_CHILD)
-    {
-        if (!is_array($parent)) {
-            $parent = [$parent];
-        }
-
-        $nodes = new Select($this->table);
-        $nodes
-            ->columns([
-                'id' => $this->idColumn
-            ])
-            ->where
-            ->in(
-                $this->parentColumn,
-                $parent
-            );
-
-        $nodes = $this->sql->prepareStatementForSqlObject($nodes)->execute();
-
-        if (!$nodes instanceof ResultInterface && !$nodes->isQueryResult()) {
+        if (! $result instanceof ResultInterface) {
             throw new UnknownDbException();
         }
 
-        if (!$nodes->getAffectedRows()) {
-            return 0;
-        }
-
-        $children = [];
-
-        foreach ($nodes as $node) {
-            $children[] = $node['id'];
-        }
-
-        $nodes = null;
-
-        if ($destination) {
-            $count = $this->move($children, $destination, $position);
-        } else {
-            $count = $this->delete($children);
-        }
-
-        return $count;
+        return $result->getGeneratedValue();
     }
 }

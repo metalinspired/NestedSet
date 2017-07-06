@@ -2,7 +2,11 @@
 
 namespace metalinspired\NestedSet;
 
-use metalinspired\NestedSet\Exception;
+use metalinspired\NestedSet\Exception\InvalidArgumentException;
+use metalinspired\NestedSet\Exception\InvalidNodeIdentifierException;
+use metalinspired\NestedSet\Exception\NodeChildOrSiblingToItself;
+use metalinspired\NestedSet\Exception\RuntimeException;
+use metalinspired\NestedSet\Exception\UnknownDbException;
 use Zend\Db\Adapter\Driver\ResultInterface;
 use Zend\Db\Adapter\Driver\StatementInterface;
 use Zend\Db\Sql\Delete;
@@ -13,8 +17,6 @@ use Zend\Db\Sql\Update;
 
 class Manipulate extends AbstractNestedSet
 {
-    use CreateInsertGapTrait;
-
     /**
      * Constants for move method
      */
@@ -23,159 +25,295 @@ class Manipulate extends AbstractNestedSet
         MOVE_MAKE_CHILD = 'make_child';
 
     /**
-     * Creates a statement for closing gap
-     * Statement has following placeholders:
-     *  :source1
-     *  :size1
-     *  :source2
-     *  :size2
-     *  :source3
+     * Returns an array of most often used columns
      *
-     * @return StatementInterface
-     */
-    protected function getCloseGapStatement()
-    {
-        if (!array_key_exists('close_gap', $this->statements)) {
-            $closeGapStatement = new Update($this->table);
-
-            $closeGapStatement
-                ->set([
-                    $this->leftColumn => new Expression(
-                        '(CASE WHEN ? > :source1 THEN ? - :size1 ELSE ? END)',
-                        [
-                            [$this->leftColumn => Expression::TYPE_IDENTIFIER],
-                            [$this->leftColumn => Expression::TYPE_IDENTIFIER],
-                            [$this->leftColumn => Expression::TYPE_IDENTIFIER]
-                        ]
-                    ),
-                    $this->rightColumn => new Expression(
-                        '(CASE WHEN ? > :source2 THEN ? - :size2 ELSE ? END)',
-                        [
-                            [$this->rightColumn => Expression::TYPE_IDENTIFIER],
-                            [$this->rightColumn => Expression::TYPE_IDENTIFIER],
-                            [$this->rightColumn => Expression::TYPE_IDENTIFIER]
-                        ]
-                    )
-                ])
-                ->where
-                ->greaterThan(
-                    $this->rightColumn,
-                    new Expression(':source3')
-                );
-
-            $this->statements['close_gap'] = $this->sql->prepareStatementForSqlObject($closeGapStatement);
-        }
-
-        return $this->statements['close_gap'];
-    }
-
-    /**
-     * Creates a statement for getting left and right values of a node
-     * Statement has following placeholders:
-     *  :id
-     *
-     * @return StatementInterface
+     * @return array
      */
     protected function getCommonColumns()
     {
-        if (!array_key_exists('common_columns', $this->statements)) {
-            $select = new Select($this->table);
+        return [
+            'id' => $this->idColumn,
+            'lft' => $this->leftColumn,
+            'rgt' => $this->rightColumn
+        ];
+    }
 
-            $select
-                ->columns([
-                    'lft' => $this->leftColumn,
-                    'rgt' => $this->rightColumn
-                ])
-                ->where
-                ->equalTo(
-                    $this->idColumn,
-                    new Expression(':id')
-                );
+    /**
+     * Finds nodes with columns set from getCommonColumns
+     *
+     * @param array $identifiers
+     * @return ResultInterface
+     */
+    protected function findNodes(array $identifiers)
+    {
+        //TODO: make a version when only one id is requested cachable ?!?
 
-            $this->statements['common_columns'] = $this->sql->prepareStatementForSqlObject($select);
+        $select = new Select($this->table);
+        $select
+            ->columns($this->getCommonColumns())
+            ->order($this->leftColumn . ' ASC')
+            ->where
+            ->in(
+                $this->idColumn,
+                $identifiers
+            );
+
+        $result = $this->sql->prepareStatementForSqlObject($select)->execute();
+
+        if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+            throw new UnknownDbException();
         }
 
-        return $this->statements['common_columns'];
+        return $result;
+    }
+
+    /**
+     * Finds children of specified parents
+     *
+     * @param array $parents
+     * @return array
+     */
+    protected function findChildren(array $parents)
+    {
+        $select = new Select(['q' => $this->table]);
+
+        $select
+            ->columns([])
+            ->join(
+                ['w' => $this->table],
+                "w.{$this->leftColumn} >= q.{$this->leftColumn} " .
+                "AND w.{$this->rightColumn} < q.{$this->rightColumn}",
+                []
+            )
+            ->join(
+                ['t' => $this->table],
+                "t.{$this->leftColumn} BETWEEN w.{$this->leftColumn} AND w.{$this->rightColumn}",
+                [
+                    'id' => $this->idColumn
+                ]
+            )
+            ->group("t.{$this->idColumn}");
+
+        $select
+            ->having
+            ->equalTo(new Expression('COUNT(*)'), 1);
+
+        $select
+            ->where
+            ->in(
+                "q.{$this->idColumn}",
+                $parents
+            );
+
+        $result = $this->sql->prepareStatementForSqlObject($select)->execute();
+
+        if (! $result instanceof ResultInterface && ! $result->isQueryResult()) {
+            throw new UnknownDbException();
+        }
+
+        $children = [];
+
+        foreach ($result as $node) {
+            $children[] = $node['id'];
+        }
+
+        return $children;
+    }
+
+    /**
+     * Checks if nodes are continuous siblings and creates a range to be moved
+     *
+     * @param array $sources            Identifiers of nodes
+     * @param bool  $childrenBreakRange If set to false to make nodes that are children fall within valid range
+     * @return array                    Array whose first element is a range array and, possibly, identifiers of nodes
+     *                                  from sources array who were not direct siblings therefore did not fall
+     *                                  into valid range
+     */
+    protected function sourcesToRange($sources, $childrenBreakRange = true)
+    {
+        if (! is_array($sources)) {
+            $sources = [$sources];
+        }
+
+        /*
+         * Get nodes and relevant data
+         */
+        $nodes = $this->findNodes($sources);
+
+        /*
+         * Identifier of nodes that didn't fall within range of continuous nodes
+         * Used to filter non existing nodes
+         */
+        $idsOutOfRange = [];
+
+        /*
+         * Range that is to be moved
+         */
+        $range = null;
+
+        /*
+         * Trigger for changing behavior when looping through nodes
+         */
+        $rangeComplete = false;
+
+        /*
+         * Right value of previous node
+         */
+        $right = null;
+
+        /*
+         * Check if nodes are continuous siblings
+         */
+        while ($node = $nodes->current()) {
+            $node = $this->arrayValuesToInt($node);
+
+            /*
+             * Remove node from sources array
+             */
+            unset($sources[array_search($node['id'], $sources)]);
+
+            if (! $rangeComplete) {
+                if ($right && (
+                        $right < $node['rgt'] && ! $childrenBreakRange
+                        || $node['lft'] !== $right + 1 && $childrenBreakRange
+                    )
+                ) {
+                    $rangeComplete = true;
+                    $idsOutOfRange[] = $node['id'];
+                    $nodes->next();
+                    continue;
+                }
+                if (! $range) {
+                    $range = $node;
+                    $range['count'] = 0;
+                    $range['last_id'] = $node['id'];
+                }
+                if ($node['rgt'] > $right) {
+                    $range['rgt'] = $node['rgt'];
+                    $range['last_id'] = $node['id'];
+                    $range['count']++;
+                    $right = $node['rgt'];
+                }
+            } else {
+                $idsOutOfRange[] = $node['id'];
+            }
+
+            /*
+             * Advance to next node
+             */
+            $nodes->next();
+        }
+
+        /*
+         * If sources array is not empty than it contains non-existing node identifier
+         */
+        if (! empty($sources)) {
+            throw new RuntimeException(sprintf(
+                'Node %s could not be found',
+                reset($sources)
+            ));
+        }
+        /*
+         * Create a array composed of valid range as first element and
+         * identifiers of nodes who do not fall within computed range
+         */
+        $range = array_merge([$range], $idsOutOfRange);
+
+        return $range;
+    }
+
+    /**
+     * Converts array values to integers
+     *
+     * @param array $array
+     * @return array
+     */
+    protected function arrayValuesToInt(array $array)
+    {
+        foreach ($array as &$value) {
+            $value = (int)$value;
+        }
+
+        return $array;
     }
 
     /**
      * Moves a range between, and including, provided left and right values
      *
-     * @param int    $sourceLeft  Source node left value
-     * @param int    $sourceRight Source node right value
+     * @param array  $sourceRange Array with data about range of nodes that are to be moved
      * @param int    $destination Destination for source node
      * @param string $position    Move node to before/after destination or make it a child of destination node
      * @return int Number of rows affected
      */
-    protected function moveRange($sourceLeft, $sourceRight, $destination, $position)
+    protected function moveRange($sourceRange, $destination, $position = self::MOVE_AFTER)
     {
         /*
-         * Prevent user from moving nodes before or after root node
+         * Get destination node
          */
-        if ($this->getRootNodeId() == $destination &&
-            ($position == self::MOVE_BEFORE || $position == self::MOVE_AFTER)
-        ) {
-            throw new Exception\RuntimeException('Node(s) can not be moved before or after root node');
+        $destinationNode = $this->findNodes([':id' => $destination]);
+
+        if (! $destinationNode instanceof ResultInterface || ! $destinationNode->isQueryResult()) {
+            throw new UnknownDbException();
         }
 
-        /*
-         * Determine exact destination for moving node
-         */
-        $result = $this->getCommonColumns()->execute([':id' => $destination]);
-
-        if (1 !== $result->getAffectedRows()) {
-            throw new Exception\RuntimeException(sprintf(
+        if (1 !== $destinationNode->getAffectedRows()) {
+            throw new RuntimeException(sprintf(
                 'Destination node with identifier %s was not found or not unique',
                 $destination
             ));
         }
 
-        switch ($position) {
-            case self::MOVE_AFTER:
-                $destination = (int)$result->current()['rgt'];
-                break;
-            case self::MOVE_BEFORE:
-                $destination = (int)$result->current()['lft'] - 1;
-                break;
-            case self::MOVE_MAKE_CHILD:
-                $destination = (int)$result->current()['rgt'] - 1;
-                break;
-            default:
-                throw new Exception\RuntimeException('Unknown position');
+        $destinationNode = $this->arrayValuesToInt($destinationNode->current());
+
+        /*
+         * Check if a node in range is being set as child/sibling of itself or own descendants
+         */
+        if ($destinationNode['lft'] > $sourceRange['lft'] && $destinationNode['rgt'] <= $sourceRange['rgt']) {
+            throw new NodeChildOrSiblingToItself();
         }
 
         /*
-         * Check if node is being set as its own child
+         * Determine exact destination for moving node
          */
-        if ($destination >= $sourceLeft && $destination < $sourceRight) {
-            throw new Exception\NodeChildOrSiblingToItself();
+        switch ($position) {
+            case self::MOVE_AFTER:
+                $destinationPosition = $destinationNode['rgt'];
+                break;
+            case self::MOVE_BEFORE:
+                $destinationPosition = $destinationNode['lft'] - 1;
+                break;
+            case self::MOVE_MAKE_CHILD:
+                $destinationPosition = $destinationNode['rgt'] - 1;
+                break;
+            default:
+                throw new RuntimeException('Unknown position');
         }
 
         /*
          * If node is moving backwards flip source range and nodes affected by move
          */
-        if ($sourceLeft > $destination) {
-            $movementSize = $sourceLeft - $destination - 1;
-            $nodeSize = $sourceRight - $sourceLeft + 1;
-            $destination = $sourceRight;
-            $sourceLeft -= $movementSize;
-            $sourceRight -= $nodeSize;
+        if ($sourceRange['lft'] > $destinationPosition) {
+            $movementSize = $sourceRange['lft'] - $destinationPosition - 1;
+            $nodeSize = $sourceRange['rgt'] - $sourceRange['lft'] + 1;
+            $destinationPosition = $sourceRange['rgt'];
+            $sourceRange['lft'] -= $movementSize;
+            $sourceRange['rgt'] -= $nodeSize;
         }
 
         /*
          * Calculate size of moving node
          */
-        $nodeSize = $sourceRight - $sourceLeft + 1;
+        $nodeSize = $sourceRange['rgt'] - $sourceRange['lft'] + 1;
 
         /*
          * Calculate size of movement
          */
-        $movementSize = $destination - $sourceRight;
+        $movementSize = $destinationPosition - $sourceRange['rgt'];
 
         /*
          * Move nodes
          */
-        if (!array_key_exists('move', $this->statements)) {
+        if (! array_key_exists('move', $this->statements)) {
             $update = new Update($this->table);
 
             $update
@@ -227,75 +365,187 @@ class Manipulate extends AbstractNestedSet
         /** @var StatementInterface $moveStatement */
         $moveStatement = $this->statements['move'];
 
-        $result = $moveStatement->execute([
+        $parameters = [
             // Left
-            ':increase1start' => $sourceLeft,
-            ':increase1end' => $sourceRight,
+            ':increase1start' => $sourceRange['lft'],
+            ':increase1end' => $sourceRange['rgt'],
             ':increase1' => $movementSize,
-            ':decrease1start' => $sourceRight + 1,
-            ':decrease1end' => $sourceRight + $movementSize,
+            ':decrease1start' => $sourceRange['rgt'] + 1,
+            ':decrease1end' => $sourceRange['rgt'] + $movementSize,
             ':decrease1' => $nodeSize,
             // Right
-            ':increase2start' => $sourceLeft,
-            ':increase2end' => $sourceRight,
+            ':increase2start' => $sourceRange['lft'],
+            ':increase2end' => $sourceRange['rgt'],
             ':increase2' => $movementSize,
-            ':decrease2start' => $sourceRight + 1,
-            ':decrease2end' => $sourceRight + $movementSize,
+            ':decrease2start' => $sourceRange['rgt'] + 1,
+            ':decrease2end' => $sourceRange['rgt'] + $movementSize,
             ':decrease2' => $nodeSize,
             // Where
-            ':from1' => $sourceLeft,
-            ':to1' => $destination + 1,
-            ':from2' => $sourceLeft,
-            ':to2' => $destination + 1
-        ]);
+            ':from1' => $sourceRange['lft'],
+            ':to1' => $destinationPosition + 1,
+            ':from2' => $sourceRange['lft'],
+            ':to2' => $destinationPosition + 1
+        ];
+
+        $result = $moveStatement->execute($parameters);
+
+        if (! $result instanceof ResultInterface) {
+            throw new UnknownDbException();
+        }
 
         return $result->getAffectedRows();
     }
 
-    protected function deleteRange($left, $right)
+    /**
+     * Deletes all nodes within a range
+     *
+     * @param $range
+     * @return int Number of nodes deleted
+     */
+    protected function deleteRange($range)
     {
         /*
-         * Calculate size of node
+         * Calculate size of range
          */
-        $size = $right - $left + 1;
+        $size = $range['rgt'] - $range['lft'] + 1;
 
         /*
-         * Delete the node including its children
+         * Delete range
          */
-        $delete = new Delete($this->table);
+        if (! array_key_exists('delete_range', $this->statements)) {
+            $delete = new Delete($this->table);
 
-        $delete
-            ->where
-            ->greaterThanOrEqualTo(
-                $this->leftColumn,
-                $left
-            )
-            ->lessThanOrEqualTo(
-                $this->rightColumn,
-                $right
-            );
+            $delete
+                ->where
+                ->greaterThanOrEqualTo(
+                    $this->leftColumn,
+                    new Expression(':from')
+                )
+                ->lessThanOrEqualTo(
+                    $this->rightColumn,
+                    new Expression(':to')
+                );
 
-        $result = $this->sql->prepareStatementForSqlObject($delete)->execute();
+            $this->statements['delete_range'] = $this->sql->prepareStatementForSqlObject($delete);
+        }
+
+        /** @var StatementInterface $deleteRangeStatement */
+        $deleteRangeStatement = $this->statements['delete_range'];
+
+        $parameters = [
+            ':from' => $range['lft'],
+            ':to' => $range['rgt']
+        ];
+
+        $result = $deleteRangeStatement->execute($parameters);
+
+        if (! $result instanceof ResultInterface) {
+            throw new UnknownDbException();
+        }
+
+        $count = $result->getAffectedRows();
 
         /*
          * Close the gap left after deleting
          */
-        $this->getCloseGapStatement()->execute([
-            ':source1' => $right,
-            ':size1' => $size,
-            ':source2' => $right,
-            ':size2' => $size,
-            ':source3' => $right
-        ]);
+        if (! array_key_exists('close_gap', $this->statements)) {
+            $update = new Update($this->table);
 
-        return $result->getAffectedRows();
+            $update
+                ->set([
+                    $this->leftColumn => new Expression(
+                        '(CASE WHEN ? > :leftDecreaseStart THEN ? - :leftDecrease ELSE ? END)',
+                        [
+                            [$this->leftColumn => Expression::TYPE_IDENTIFIER],
+                            [$this->leftColumn => Expression::TYPE_IDENTIFIER],
+                            [$this->leftColumn => Expression::TYPE_IDENTIFIER]
+                        ]
+                    ),
+                    $this->rightColumn => new Expression(
+                        '(CASE WHEN ? > :rightDecreaseStart THEN ? - :rightDecrease ELSE ? END)',
+                        [
+                            [$this->rightColumn => Expression::TYPE_IDENTIFIER],
+                            [$this->rightColumn => Expression::TYPE_IDENTIFIER],
+                            [$this->rightColumn => Expression::TYPE_IDENTIFIER]
+                        ]
+                    )
+                ])
+                ->where
+                ->greaterThan(
+                    $this->rightColumn,
+                    new Expression(':start')
+                );
+
+            $this->statements['close_gap'] = $this->sql->prepareStatementForSqlObject($update);
+        }
+
+        /** @var StatementInterface $closeGapStatement */
+        $closeGapStatement = $this->statements['close_gap'];
+
+        $parameters = [
+            ':leftDecreaseStart' => $range['rgt'],
+            ':leftDecrease' => $size,
+            ':rightDecreaseStart' => $range['rgt'],
+            ':rightDecrease' => $size,
+            ':start' => $range['rgt']
+        ];
+
+        $result = $closeGapStatement->execute($parameters);
+
+        if (! $result instanceof ResultInterface) {
+            throw new UnknownDbException();
+        }
+
+        return $count;
+    }
+
+    /**
+     * Creates statement for creating gap when inserting nodes
+     *
+     * @return StatementInterface
+     */
+    protected function getInsertMethodCreateGapStatement()
+    {
+        /*
+         * Create a gap to insert new record
+         */
+        if (! array_key_exists('create_gap__insert', $this->statements)) {
+            $update = new Update($this->table);
+
+            $update
+                ->set([
+                    $this->rightColumn => new Expression(
+                        '? + 2',
+                        [
+                            [$this->rightColumn => Expression::TYPE_IDENTIFIER]
+                        ]
+                    ),
+                    $this->leftColumn => new Expression(
+                        '(CASE WHEN ? > :newPosition THEN ? + 2 ELSE ? END)',
+                        [
+                            [$this->leftColumn => Expression::TYPE_IDENTIFIER],
+                            [$this->leftColumn => Expression::TYPE_IDENTIFIER],
+                            [$this->leftColumn => Expression::TYPE_IDENTIFIER]
+                        ]
+                    )
+                ])
+                ->where
+                ->greaterThanOrEqualTo(
+                    $this->rightColumn,
+                    new Expression(':newPositionWhere')
+                );
+
+            $this->statements['create_gap__insert'] = $this->sql->prepareStatementForSqlObject($update);
+        }
+
+        return $this->statements['create_gap__insert'];
     }
 
     /**
      * Creates a root node
      *
      * @return string Root node identifier
-     * @throws Exception\RuntimeException
+     * @throws RuntimeException
      */
     public function createRootNode()
     {
@@ -312,8 +562,12 @@ class Manipulate extends AbstractNestedSet
 
         $result = $this->sql->prepareStatementForSqlObject($select)->execute();
 
+        if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+            throw new UnknownDbException();
+        }
+
         if ($result->current()['count'] != 0) {
-            throw new Exception\RuntimeException(
+            throw new RuntimeException(
                 sprintf(
                     'Can\'t create root node. Table %s is not empty',
                     $this->table
@@ -330,6 +584,10 @@ class Manipulate extends AbstractNestedSet
 
         $result = $this->sql->prepareStatementForSqlObject($insert)->execute();
 
+        if (! $result instanceof ResultInterface) {
+            throw new UnknownDbException();
+        }
+
         return $result->getGeneratedValue();
     }
 
@@ -339,24 +597,28 @@ class Manipulate extends AbstractNestedSet
      * @param int|string $parent Identifier of parent node
      * @param array      $data   Data for new node
      * @return mixed|null Identifier for newly created node
-     * @throws Exception\InvalidNodeIdentifierException
-     * @throws Exception\RuntimeException
+     * @throws InvalidNodeIdentifierException
+     * @throws RuntimeException
      *
      * TODO: add ability to insert after or before a node, like in move method
      */
     public function insert($parent, array $data = [])
     {
-        if (!is_int($parent) && !is_string($parent)) {
-            throw new Exception\InvalidNodeIdentifierException($parent, 'Parent');
+        if (! is_int($parent) && ! is_string($parent)) {
+            throw new InvalidNodeIdentifierException($parent, 'Parent');
         }
 
         /*
          * Get parents right column value as left column value for new node
          */
-        $result = $this->getCommonColumns()->execute([':id' => $parent]);
+        $result = $this->findNodes([':id' => $parent]);
+
+        if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+            throw new UnknownDbException();
+        }
 
         if (0 === $result->getAffectedRows()) {
-            throw new Exception\RuntimeException(sprintf(
+            throw new RuntimeException(sprintf(
                 "Parent with identifier %s was not found or not unique",
                 $parent
             ));
@@ -366,12 +628,16 @@ class Manipulate extends AbstractNestedSet
         /*
          * Create a gap to insert new record
          */
-        $createGap = $this->getInsertMethodCreateGapStatement();
-
-        $createGap->execute([
+        $parameters = [
             ':newPosition' => $newPosition,
             ':newPositionWhere' => $newPosition
-        ]);
+        ];
+
+        $result = $this->getInsertMethodCreateGapStatement()->execute($parameters);
+
+        if (! $result instanceof ResultInterface) {
+            throw new UnknownDbException();
+        }
 
         /*
          * Insert new data
@@ -385,78 +651,79 @@ class Manipulate extends AbstractNestedSet
 
         $result = $this->sql->prepareStatementForSqlObject($insert)->execute();
 
+        if (! $result instanceof ResultInterface) {
+            throw new UnknownDbException();
+        }
+
         return $result->getGeneratedValue();
     }
 
     /**
-     * Moves a node
+     * Move node(s)
      *
-     * @param int|string $source      Identifier of source node
-     * @param int|string $destination Identifier of destination node
-     * @param string     $position    Move node to before/after destination or make it a child of destination node
-     * @return int Number of affected rows
-     * @throws Exception\RuntimeException
-     * @throws Exception\InvalidArgumentException
-     * @throws Exception\InvalidNodeIdentifierException
+     * @param int|string|array $source      Identifier of source node or array of identifiers
+     * @param int|string       $destination Identifier of destination node
+     * @param string           $position    Move node to before/after destination or make it a child of destination node
+     * @return int                          Number of nodes moved
+     * @throws InvalidArgumentException
+     * @throws InvalidNodeIdentifierException
+     * @throws NodeChildOrSiblingToItself
      */
     public function move($source, $destination, $position = self::MOVE_AFTER)
     {
-        /*
-         * Prevent user from moving root node
-         */
-        if ($this->getRootNodeId() == $source) {
-            throw new Exception\RuntimeException('Root node can\'t be moved');
+        if (! is_int($source) && ! is_string($source) && ! is_array($source)) {
+            // TODO: Exception does not state it can be array
+            throw new InvalidNodeIdentifierException($source, 'Source node');
         }
 
-        /*
-         * Bail early if source and destination are same
-         */
-        if ($source == $destination) {
-            return 0;
-        }
-
-        if (!is_int($source) && !is_string($source)) {
-            throw new Exception\InvalidNodeIdentifierException($source, 'Source node');
-        }
-
-        if (!is_int($destination) && !is_string($destination)) {
-            throw new Exception\InvalidNodeIdentifierException($destination, 'Destination node');
-        }
-
-        if (!is_string($position)) {
-            throw new Exception\InvalidArgumentException(sprintf(
-                'Method expects integer as $where parameter. Instance of %s given',
-                is_object($position) ? get_class($position) : gettype($position)
-            ));
+        if (! is_int($destination) && ! is_string($destination)) {
+            throw new InvalidNodeIdentifierException($destination, 'Destination node');
         }
 
         if ($position !== self::MOVE_AFTER && $position !== self::MOVE_BEFORE && $position !== self::MOVE_MAKE_CHILD) {
-            throw new Exception\InvalidArgumentException(sprintf(
+            throw new InvalidArgumentException(sprintf(
                 '$where parameter value can be either \'after\', \'before\' or \'make_child\'. \'%s\' given',
                 $position
             ));
         }
 
         /*
-         * Get left and right values of moving node
+         * Prevent user from moving node to be sibling of root node
          */
-        $result = $this->getCommonColumns()->execute([':id' => $source]);
-
-        if (!$result instanceof ResultInterface || !$result->isQueryResult()) {
-            throw new Exception\UnknownDbException();
+        if ($this->getRootNodeId() == $destination
+            && (self::MOVE_AFTER === $position || self::MOVE_BEFORE === $position)
+        ) {
+            throw new RuntimeException('Node can not be moved to be sibling of root node');
         }
 
-        if ($result->getAffectedRows() !== 1) {
-            throw new Exception\RuntimeException(sprintf(
-                'Source node with identifier %s was not found or not unique',
-                $source
-            ));
+        /*
+         * Bail early if moving single node when source and destination are same
+         */
+        if (! is_array($source) && $source == $destination) {
+            if ($position === self::MOVE_MAKE_CHILD) {
+                throw new NodeChildOrSiblingToItself();
+            }
+
+            return 0;
         }
 
-        $sourceLeft = (int)$result->current()['lft'];
-        $sourceRight = (int)$result->current()['rgt'];
+        $source = $this->sourcesToRange($source);
 
-        return $this->moveRange($sourceLeft, $sourceRight, $destination, $position);
+        $sourceRange = array_shift($source);
+
+        $count = ($sourceRange['rgt'] - $sourceRange['lft'] + 1) / 2;
+
+        $this->moveRange($sourceRange, $destination, $position);
+
+        /*
+         * Check if there is more nodes that need to be moved
+         * but change destination to after last moved node
+         */
+        if (! empty($source)) {
+            $count += $this->move($source, $sourceRange['last_id'], self::MOVE_AFTER);
+        }
+
+        return $count;
     }
 
     /**
@@ -501,112 +768,92 @@ class Manipulate extends AbstractNestedSet
     /**
      * Deletes a node
      *
-     * @param int|string $id Node identifier
-     * @return int number of rows affected (Nodes deleted)
-     * @throws Exception\InvalidNodeIdentifierException
-     * @throws Exception\RuntimeException
+     * @param int|string|array $id Identifier of source node or array of identifiers
+     * @return int                 Number of nodes deleted
+     * @throws InvalidNodeIdentifierException
+     * @throws RuntimeException
      */
     public function delete($id)
     {
-        if (!is_int($id) && !is_string($id)) {
-            throw new Exception\InvalidNodeIdentifierException($id);
+        if (! is_int($id) && ! is_string($id) && ! is_array($id)) {
+            // TODO: Exception does not state it can be array
+            throw new InvalidNodeIdentifierException($id);
         }
 
         /*
          * Prevent user from deleting root node
          */
-        if ($this->getRootNodeId() == $id) {
-            throw new Exception\RuntimeException('Root node can\'t be deleted');
+        if (is_array($id) && in_array($this->getRootNodeId(), $id)
+            || $this->getRootNodeId() == $id
+        ) {
+            throw new RuntimeException('Root node can\'t be deleted');
         }
 
-        /*
-         * Get right and left values of node that is being deleted
-         */
-        $result = $this->getCommonColumns()->execute([':id' => $id]);
+        $id = $this->sourcesToRange($id, false);
 
-        if (1 !== $result->getAffectedRows()) {
-            throw new Exception\RuntimeException(sprintf(
-                "Node with identifier: %s was not found or not unique",
-                $id
-            ));
+        $range = array_shift($id);
+
+        $count = $this->deleteRange($range);
+
+        if (! empty($id)) {
+            $count += $this->delete($id);
         }
 
-        $nodeLeft = (int)$result->current()['lft'];
-        $nodeRight = (int)$result->current()['rgt'];
-
-        return $this->deleteRange($nodeLeft, $nodeRight);
+        return $count;
     }
 
     /**
      * Empties a node by removing its descendants
      * or by moving them to a new location
      *
-     * @param int|string      $parent      Identifier of parent node
-     * @param null|int|string $destination Identifier of destination node or null
-     * @param string          $position    Move node to before/after destination or make it a child of destination node
+     * @param int|string|array $parents     Identifier of parent node or array with identifiers
+     *                                      if multiple parents are to be cleaned
+     * @param null|int|string  $destination Identifier of destination node or null
+     * @param string           $position    Move node to before/after destination or make it a child
+     *                                      of destination node
      * @return int Number of affected rows
-     * @throws Exception\InvalidArgumentException
-     * @throws Exception\InvalidNodeIdentifierException
-     * @throws Exception\RuntimeException
+     * @throws InvalidArgumentException
+     * @throws InvalidNodeIdentifierException
+     * @throws RuntimeException
      */
-    public function clean($parent, $destination = null, $position = self::MOVE_MAKE_CHILD)
+    public function clean($parents, $destination = null, $position = self::MOVE_MAKE_CHILD)
     {
-        if (!is_int($parent) && !is_string($parent)) {
-            throw new Exception\InvalidNodeIdentifierException($parent);
+        if (! is_int($parents) && ! is_string($parents) && ! is_array($parents)) {
+            // TODO: Exception does not state it can be array
+            throw new InvalidNodeIdentifierException($parents);
         }
 
-        if (!is_null($destination) && !is_int($destination) && !is_string($destination)) {
-            throw new Exception\InvalidNodeIdentifierException($destination);
+        if (! is_null($destination) && ! is_int($destination) && ! is_string($destination)) {
+            throw new InvalidNodeIdentifierException($destination);
         }
 
-        if (null !== $destination) {
-            if (!is_string($position)) {
-                throw new Exception\InvalidArgumentException(sprintf(
-                    'Method expects integer as $where parameter. Instance of %s given',
-                    is_object($position) ? get_class($position) : gettype($position)
-                ));
-            }
-
-            if ($position !== self::MOVE_AFTER &&
-                $position !== self::MOVE_BEFORE &&
-                $position !== self::MOVE_MAKE_CHILD
-            ) {
-                throw new Exception\InvalidArgumentException(sprintf(
-                    '$where parameter value can be either \'after\', \'before\' or \'make_child\'. \'%s\' given',
-                    $position
-                ));
-            }
-        }
-
-        /*
-         * Get left and right value of parent node
-         */
-        $result = $this->getCommonColumns()->execute([':id' => $parent]);
-
-        if (1 !== $result->getAffectedRows()) {
-            throw new Exception\RuntimeException(sprintf(
-                "Parent node with identifier: %s was not found or not unique",
-                $parent
+        if (null !== $destination
+            && $position !== self::MOVE_AFTER
+            && $position !== self::MOVE_BEFORE
+            && $position !== self::MOVE_MAKE_CHILD
+        ) {
+            throw new InvalidArgumentException(sprintf(
+                '$where parameter value can be either \'after\', \'before\' or \'make_child\'. \'%s\' given',
+                $position
             ));
         }
 
-        $parentLeft = (int)$result->current()['lft'];
-        $parentRight = (int)$result->current()['rgt'];
+        if (! is_array($parents)) {
+            $parents = [$parents];
+        }
 
-        /*
-         * If parent node is empty bail
-         */
-        if ($parentLeft + 1 == $parentRight) {
+        $children = $this->findChildren($parents);
+
+        if (! count($children)) {
             return 0;
         }
 
-        $parentLeft++;
-        $parentRight--;
-
-        if (null !== $destination) {
-            return $this->moveRange($parentLeft, $parentRight, $destination, $position);
+        if ($destination) {
+            $count = $this->move($children, $destination, $position);
+        } else {
+            $count = $this->delete($children);
         }
 
-        return $this->deleteRange($parentLeft, $parentRight);
+        return $count;
     }
 }

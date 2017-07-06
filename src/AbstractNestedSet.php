@@ -96,6 +96,7 @@ abstract class AbstractNestedSet
     {
         $this->statements = [];
         $this->adapter = $adapter;
+
         return $this;
     }
 
@@ -118,12 +119,13 @@ abstract class AbstractNestedSet
      */
     public function setTable($table)
     {
-        if (!is_string($table) && !is_array($table)) {
+        if (! is_string($table) && ! is_array($table)) {
             throw new Exception\InvalidArgumentException();
         }
 
         $this->statements = [];
         $this->table = $table;
+
         return $this;
     }
 
@@ -202,13 +204,14 @@ abstract class AbstractNestedSet
     /**
      * Returns identifier of root node
      *
-     * @return int|string
+     * @return string
      */
     public function getRootNodeId()
     {
         if (null === $this->rootNodeId) {
             $this->detectRootNodeId();
         }
+
         return $this->rootNodeId;
     }
 
@@ -220,7 +223,7 @@ abstract class AbstractNestedSet
      */
     public function setRootNodeId($id)
     {
-        if (!is_null($id) && !is_int($id) && (!is_string($id) || empty($id))) {
+        if (! is_null($id) && ! is_int($id) && (! is_string($id) || empty($id))) {
             throw new Exception\InvalidRootNodeIdentifierException($id);
         }
 
@@ -279,7 +282,7 @@ abstract class AbstractNestedSet
 
         $result = $this->sql->prepareStatementForSqlObject($select)->execute();
 
-        if (!$result instanceof ResultInterface || !$result->isQueryResult()) {
+        if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
             throw new Exception\UnknownDbException();
         }
 
@@ -299,7 +302,7 @@ abstract class AbstractNestedSet
      */
     protected function checkColumnName($name)
     {
-        if (!is_string($name) || empty($name)) {
+        if (! is_string($name) || empty($name)) {
             throw new Exception\InvalidColumnNameException();
         }
 

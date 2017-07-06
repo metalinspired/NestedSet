@@ -4,6 +4,7 @@ namespace metalinspired\NestedSet;
 
 use metalinspired\NestedSet\Exception\InvalidArgumentException;
 use metalinspired\NestedSet\Exception\InvalidNodeIdentifierException;
+use metalinspired\NestedSet\Exception\UnknownDbException;
 use Zend\Db\Adapter\Driver\ResultInterface;
 use Zend\Db\Adapter\Driver\StatementInterface;
 use Zend\Db\Sql\Expression;
@@ -11,7 +12,6 @@ use Zend\Db\Sql\Join;
 use Zend\Db\Sql\Predicate\Predicate;
 use Zend\Db\Sql\Select;
 
-//TODO: Implement error checking in find methods
 class Find extends AbstractNestedSet
 {
     /**
@@ -71,6 +71,7 @@ class Find extends AbstractNestedSet
     {
         $this->statements = [];
         $this->includeSearchingNode = (bool)$includeSearchingNode;
+
         return $this;
     }
 
@@ -95,6 +96,7 @@ class Find extends AbstractNestedSet
     {
         $this->statements = [];
         $this->columns = $columns;
+
         return $this;
     }
 
@@ -112,6 +114,7 @@ class Find extends AbstractNestedSet
     {
         $this->statements = [];
         $this->joins->join($name, $on, $columns, $type);
+
         return $this;
     }
 
@@ -124,6 +127,7 @@ class Find extends AbstractNestedSet
     {
         $this->statements = [];
         $this->joins->reset();
+
         return $this;
     }
 
@@ -146,12 +150,13 @@ class Find extends AbstractNestedSet
      */
     public function setDepthLimit($depthLimit)
     {
-        if (!is_int($depthLimit) && null !== $depthLimit) {
+        if (! is_int($depthLimit) && null !== $depthLimit) {
             throw new InvalidArgumentException();
         }
 
         $this->statements = [];
         $this->depthLimit = $depthLimit;
+
         return $this;
     }
 
@@ -419,7 +424,7 @@ class Find extends AbstractNestedSet
                 1
             );
 
-        if (!$this->includeSearchingNode) {
+        if (! $this->includeSearchingNode) {
             $subSelect
                 ->where
                 ->notEqualTo(
@@ -511,11 +516,11 @@ class Find extends AbstractNestedSet
      */
     public function findAncestors($id)
     {
-        if (!is_int($id) && !is_string($id)) {
+        if (! is_int($id) && ! is_string($id)) {
             throw new Exception\InvalidNodeIdentifierException($id);
         }
 
-        if (!array_key_exists('find_ancestors', $this->statements)) {
+        if (! array_key_exists('find_ancestors', $this->statements)) {
             $this->statements['find_ancestors'] = $this->sql->prepareStatementForSqlObject(
                 $this->getFindAncestorsQuery()
             );
@@ -526,7 +531,13 @@ class Find extends AbstractNestedSet
         /** @var StatementInterface $statement */
         $statement = $this->statements['find_ancestors'];
 
-        return $statement->execute($parameters);
+        $result = $statement->execute($parameters);
+
+        if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+            throw new UnknownDbException();
+        }
+
+        return $result;
     }
 
     /**
@@ -538,11 +549,11 @@ class Find extends AbstractNestedSet
      */
     public function findParent($id)
     {
-        if (!is_int($id) && !is_string($id)) {
+        if (! is_int($id) && ! is_string($id)) {
             throw new Exception\InvalidNodeIdentifierException($id);
         }
 
-        if (!array_key_exists('find_parent', $this->statements)) {
+        if (! array_key_exists('find_parent', $this->statements)) {
             $this->statements['find_parent'] = $this->sql->prepareStatementForSqlObject(
                 $this->getFindAncestorsQuery(1)
             );
@@ -553,7 +564,13 @@ class Find extends AbstractNestedSet
         /** @var StatementInterface $statement */
         $statement = $this->statements['find_parent'];
 
-        return $statement->execute($parameters);
+        $result = $statement->execute($parameters);
+
+        if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+            throw new UnknownDbException();
+        }
+
+        return $result;
     }
 
     /**
@@ -565,11 +582,11 @@ class Find extends AbstractNestedSet
      */
     public function findDescendants($id)
     {
-        if (!is_int($id) && !is_string($id)) {
+        if (! is_int($id) && ! is_string($id)) {
             throw new Exception\InvalidNodeIdentifierException($id);
         }
 
-        if (!array_key_exists('find_descendants', $this->statements)) {
+        if (! array_key_exists('find_descendants', $this->statements)) {
             $this->statements['find_descendants'] = $this->sql->prepareStatementForSqlObject(
                 $this->getFindDescendantsQuery()
             );
@@ -587,7 +604,13 @@ class Find extends AbstractNestedSet
         /** @var StatementInterface $statement */
         $statement = $this->statements['find_descendants'];
 
-        return $statement->execute($parameters);
+        $result = $statement->execute($parameters);
+
+        if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+            throw new UnknownDbException();
+        }
+
+        return $result;
     }
 
     /**
@@ -599,11 +622,11 @@ class Find extends AbstractNestedSet
      */
     public function findChildren($id)
     {
-        if (!is_int($id) && !is_string($id)) {
+        if (! is_int($id) && ! is_string($id)) {
             throw new Exception\InvalidNodeIdentifierException($id);
         }
 
-        if (!array_key_exists('find_children', $this->statements)) {
+        if (! array_key_exists('find_children', $this->statements)) {
             $this->statements['find_children'] = $this->sql->prepareStatementForSqlObject(
                 $this->getFindDescendantsQuery(1)
             );
@@ -621,7 +644,13 @@ class Find extends AbstractNestedSet
         /** @var StatementInterface $statement */
         $statement = $this->statements['find_children'];
 
-        return $statement->execute($parameters);
+        $result = $statement->execute($parameters);
+
+        if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+            throw new UnknownDbException();
+        }
+
+        return $result;
     }
 
     /**
@@ -633,11 +662,11 @@ class Find extends AbstractNestedSet
      */
     public function findFirstChild($id)
     {
-        if (!is_int($id) && !is_string($id)) {
+        if (! is_int($id) && ! is_string($id)) {
             throw new Exception\InvalidNodeIdentifierException($id);
         }
 
-        if (!array_key_exists('find_first_child', $this->statements)) {
+        if (! array_key_exists('find_first_child', $this->statements)) {
             $this->statements['find_first_child'] = $this->sql->prepareStatementForSqlObject(
                 $this->getFindChildQuery()
             );
@@ -652,7 +681,13 @@ class Find extends AbstractNestedSet
         /** @var StatementInterface $statement */
         $statement = $this->statements['find_first_child'];
 
-        return $statement->execute($parameters);
+        $result = $statement->execute($parameters);
+
+        if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+            throw new UnknownDbException();
+        }
+
+        return $result;
     }
 
     /**
@@ -664,11 +699,11 @@ class Find extends AbstractNestedSet
      */
     public function findLastChild($id)
     {
-        if (!is_int($id) && !is_string($id)) {
+        if (! is_int($id) && ! is_string($id)) {
             throw new Exception\InvalidNodeIdentifierException($id);
         }
 
-        if (!array_key_exists('find_last_child', $this->statements)) {
+        if (! array_key_exists('find_last_child', $this->statements)) {
             $this->statements['find_last_child'] = $this->sql->prepareStatementForSqlObject(
                 $this->getFindChildQuery(true)
             );
@@ -683,7 +718,13 @@ class Find extends AbstractNestedSet
         /** @var StatementInterface $statement */
         $statement = $this->statements['find_last_child'];
 
-        return $statement->execute($parameters);
+        $result = $statement->execute($parameters);
+
+        if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+            throw new UnknownDbException();
+        }
+
+        return $result;
     }
 
     /**
@@ -695,11 +736,11 @@ class Find extends AbstractNestedSet
      */
     public function findSiblings($id)
     {
-        if (!is_int($id) && !is_string($id)) {
+        if (! is_int($id) && ! is_string($id)) {
             throw new Exception\InvalidNodeIdentifierException($id);
         }
 
-        if (!array_key_exists('find_siblings', $this->statements)) {
+        if (! array_key_exists('find_siblings', $this->statements)) {
             $this->statements['find_siblings'] = $this->sql->prepareStatementForSqlObject(
                 $this->getFindSiblingsQuery()
             );
@@ -707,14 +748,20 @@ class Find extends AbstractNestedSet
 
         $parameters = [':id' => $id];
 
-        if (!$this->includeSearchingNode) {
+        if (! $this->includeSearchingNode) {
             $parameters[':childId'] = $id;
         }
 
         /** @var StatementInterface $statement */
         $statement = $this->statements['find_siblings'];
 
-        return $statement->execute($parameters);
+        $result = $statement->execute($parameters);
+
+        if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+            throw new UnknownDbException();
+        }
+
+        return $result;
     }
 
     /**
@@ -726,11 +773,11 @@ class Find extends AbstractNestedSet
      */
     public function findNextSibling($id)
     {
-        if (!is_int($id) && !is_string($id)) {
+        if (! is_int($id) && ! is_string($id)) {
             throw new Exception\InvalidNodeIdentifierException($id);
         }
 
-        if (!array_key_exists('find_next_sibling', $this->statements)) {
+        if (! array_key_exists('find_next_sibling', $this->statements)) {
             $this->statements['find_next_sibling'] = $this->sql->prepareStatementForSqlObject(
                 $this->getFindSiblingQuery()
             );
@@ -745,7 +792,13 @@ class Find extends AbstractNestedSet
         /** @var StatementInterface $statement */
         $statement = $this->statements['find_next_sibling'];
 
-        return $statement->execute($parameters);
+        $result = $statement->execute($parameters);
+
+        if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+            throw new UnknownDbException();
+        }
+
+        return $result;
     }
 
     /**
@@ -757,11 +810,11 @@ class Find extends AbstractNestedSet
      */
     public function findPreviousSibling($id)
     {
-        if (!is_int($id) && !is_string($id)) {
+        if (! is_int($id) && ! is_string($id)) {
             throw new Exception\InvalidNodeIdentifierException($id);
         }
 
-        if (!array_key_exists('find_previous_sibling', $this->statements)) {
+        if (! array_key_exists('find_previous_sibling', $this->statements)) {
             $this->statements['find_previous_sibling'] = $this->sql->prepareStatementForSqlObject(
                 $this->getFindSiblingQuery(true)
             );
@@ -776,6 +829,12 @@ class Find extends AbstractNestedSet
         /** @var StatementInterface $statement */
         $statement = $this->statements['find_previous_sibling'];
 
-        return $statement->execute($parameters);
+        $result = $statement->execute($parameters);
+
+        if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+            throw new UnknownDbException();
+        }
+
+        return $result;
     }
 }
