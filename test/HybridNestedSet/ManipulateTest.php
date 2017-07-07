@@ -383,4 +383,47 @@ class ManipulateTest extends AbstractManipulateTest
             __DIR__ . '/Fixture/CleanNodesWithMoving.xml'
         );
     }
+
+    public function testReorderNode()
+    {
+        $rows = self::$manipulate->reorder(12, 4);
+
+        $this->assertEquals(10, $rows);
+
+        $this->assertTableAndFixtureEqual(
+            $GLOBALS[self::DB_HYBRID_TABLE],
+            __DIR__ . '/Fixture/ReorderNode.xml'
+        );
+    }
+
+    public function testReorderNodeBackwards()
+    {
+        $rows = self::$manipulate->reorder(32, 2);
+
+        $this->assertEquals(10, $rows);
+
+        $this->assertTableAndFixtureEqual(
+            $GLOBALS[self::DB_HYBRID_TABLE],
+            __DIR__ . '/Fixture/ReorderNodeBackwards.xml'
+        );
+    }
+
+    public function testReorderNodeToBeLastInOrder()
+    {
+        $rows = self::$manipulate->reorder(12, 0);
+
+        $this->assertEquals(10, $rows);
+
+        $this->assertTableAndFixtureEqual(
+            $GLOBALS[self::DB_HYBRID_TABLE],
+            __DIR__ . '/Fixture/ReorderToBeLastInOrder.xml'
+        );
+    }
+
+    public function testReorderNodeToNonExistingOrder()
+    {
+        $this->expectException(RuntimeException::class);
+
+        self::$manipulate->reorder(12, 15);
+    }
 }

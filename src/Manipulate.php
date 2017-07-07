@@ -250,7 +250,7 @@ class Manipulate extends AbstractNestedSet
         /*
          * Get destination node
          */
-        $destinationNode = $this->findNodes([':id' => $destination]);
+        $destinationNode = $this->findNodes([$destination]);
 
         if (! $destinationNode instanceof ResultInterface || ! $destinationNode->isQueryResult()) {
             throw new UnknownDbException();
@@ -611,7 +611,7 @@ class Manipulate extends AbstractNestedSet
         /*
          * Get parents right column value as left column value for new node
          */
-        $result = $this->findNodes([':id' => $parent]);
+        $result = $this->findNodes([$parent]);
 
         if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
             throw new UnknownDbException();
@@ -723,7 +723,7 @@ class Manipulate extends AbstractNestedSet
             $count += $this->move($source, $sourceRange['last_id'], self::MOVE_AFTER);
         }
 
-        return $count;
+        return (int)$count;
     }
 
     /**

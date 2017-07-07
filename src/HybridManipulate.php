@@ -2,6 +2,9 @@
 
 namespace metalinspired\NestedSet;
 
+use metalinspired\NestedSet\Exception\InvalidArgumentException;
+use metalinspired\NestedSet\Exception\InvalidNodeIdentifierException;
+use metalinspired\NestedSet\Exception\RuntimeException;
 use metalinspired\NestedSet\Exception\UnknownDbException;
 use Zend\Db\Adapter\Driver\ResultInterface;
 use Zend\Db\Adapter\Driver\StatementInterface;
@@ -76,7 +79,7 @@ class HybridManipulate extends Manipulate
         /*
          * Get destination node
          */
-        $destinationNode = $this->findNodes([':id' => $destination]);
+        $destinationNode = $this->findNodes([$destination]);
 
         if (! $destinationNode instanceof ResultInterface || ! $destinationNode->isQueryResult()) {
             throw new UnknownDbException();
@@ -135,7 +138,7 @@ class HybridManipulate extends Manipulate
                 $destinationNode = $this->arrayValuesToInt($result->current());
             }
         } else {
-            $destinationParent = $this->findNodes([':id' => $destinationNode['parent']]);
+            $destinationParent = $this->findNodes([$destinationNode['parent']]);
 
             if (1 !== $destinationParent->getAffectedRows()) {
                 throw new Exception\RuntimeException(sprintf(
@@ -177,7 +180,7 @@ class HybridManipulate extends Manipulate
         /*
          * Get source node parent
          */
-        $sourceParent = $this->findNodes([':id' => $sourceRange['parent']]);
+        $sourceParent = $this->findNodes([$sourceRange['parent']]);
 
         if (1 !== $sourceParent->getAffectedRows()) {
             throw new Exception\RuntimeException(sprintf(
@@ -710,5 +713,104 @@ class HybridManipulate extends Manipulate
         }
 
         return $result->getGeneratedValue();
+    }
+
+    /**
+     * Moves node within a same parent
+     *
+     * @param string|int $id    Node identifier
+     * @param int        $order Order column value of target node or 0 to reorder as last node in parent
+     * @return int Number of nodes moved
+     * @throws InvalidNodeIdentifierException
+     * @throws InvalidArgumentException
+     * @throws RuntimeException
+     * @throws UnknownDbException
+     */
+    public function reorder($id, $order)
+    {
+        if (! is_int($id) && ! is_string($id) /*&& ! is_array($id)*/) {
+            // TODO: Exception does not state it can be array
+            throw new InvalidNodeIdentifierException($id, 'Source node');
+        }
+
+        if (! is_int($order) || is_string($order) && ! is_numeric($order)) {
+            throw new InvalidArgumentException('Order must be valid number');
+        }
+
+        $range = $this->sourcesToRange([$id])[0];
+
+        if (1 <= $order) {
+            // Find destination node
+            $select = new Select($this->table);
+
+            $select
+                ->columns(['id' => $this->idColumn])
+                ->where
+                ->equalTo(
+                    $this->orderingColumn,
+                    new Expression(':order')
+                )
+                ->equalTo(
+                    $this->parentColumn,
+                    new Expression(':parent')
+                );
+
+            $parameters = [
+                ':order' => $order,
+                ':parent' => $range['parent']
+            ];
+
+            $result = $this->sql->prepareStatementForSqlObject($select)->execute($parameters);
+
+            if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+                throw new UnknownDbException();
+            }
+
+            if (1 !== $result->getAffectedRows()) {
+                throw new RuntimeException(sprintf(
+                    'Node with order %s within parent %s not found or not unique',
+                    $order,
+                    $range['parent']
+                ));
+            }
+
+            $destinationNodeId = (int)$result->current()['id'];
+
+            $this->moveRange($range, $destinationNodeId, self::MOVE_BEFORE);
+        } else {
+            // Find last sibling
+            $select = new Select($this->table);
+
+            $select
+                ->columns([
+                    'id' => new Expression(
+                        'MAX(?)',
+                        [
+                            [$this->idColumn => Expression::TYPE_IDENTIFIER]
+                        ]
+                    )
+                ])
+                ->where
+                ->equalTo(
+                    $this->parentColumn,
+                    new Expression(':parent')
+                );
+
+            $parameters = [
+                ':parent' => $range['parent']
+            ];
+
+            $result = $this->sql->prepareStatementForSqlObject($select)->execute($parameters);
+
+            if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
+                throw new UnknownDbException();
+            }
+
+            $destinationNodeId = (int)$result->current()['id'];
+
+            $this->moveRange($range, $destinationNodeId, self::MOVE_AFTER);
+        }
+
+        return (int)($range['rgt'] - $range['lft'] + 1) / 2;
     }
 }
