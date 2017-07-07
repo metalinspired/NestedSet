@@ -86,7 +86,7 @@ $manipulate->clean($parentNode, $destinationNode);
 Manipulation methods, excluding `insert`, can also accept array of node identifiers as their first argument, meaning you can `move`, `delete` and `clean` multiple nodes with just one call.
 
 Example:
-``` php
+```php
 $manipulate->moveBefore([5,6,26,88], 33);
 ```
 
@@ -109,4 +109,23 @@ $find->findLastChild();
 $find->findSiblings();
 $find->findNextSibling();
 $find->findPreviousSibling();
+```
+
+## Factory
+
+Factory encapsulates find and manipulate classes of `NestedSet` and `HybridNestedSet` in one class.
+
+```php
+// Get factory from config object
+$factory = $config->getFactory();
+ 
+// Manually create factory
+$factory = new Factory($config);
+ 
+// Usage examples
+$factory->find->findChild();
+$factory->manipulate->moveAfter();
+$factory->hybridFind->findAncestors();
+$factory->hybridManipulate->moveBefore();
+...
 ```

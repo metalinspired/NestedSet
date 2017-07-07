@@ -87,6 +87,7 @@ class Config
     public static function createWithDsn($dsn, $username = null, $password = null)
     {
         $pdo = new \PDO($dsn, $username, $password);
+
         return self::createWithPdo($pdo);
     }
 
@@ -99,6 +100,7 @@ class Config
     public static function createWithPdo(\PDO $pdo)
     {
         $driver = new ZendPdo($pdo);
+
         return self::createWithDriver($driver);
     }
 
@@ -113,6 +115,17 @@ class Config
         $adapter = new Adapter($driver);
         $config = new self();
         $config->adapter = $adapter;
+
         return $config;
+    }
+
+    /**
+     * Returns instance of Factory
+     *
+     * @return Factory
+     */
+    public function getFactory()
+    {
+        return new Factory($this);
     }
 }
