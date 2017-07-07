@@ -50,7 +50,7 @@ $config->includeSearchingNode = true;
 
 ## Manipulation
 
-[Manipulate](src/Manipulate.php) class contains methods for creating (inserting), moving and deleting nodes in nested set model.
+[(Hybrid)](src/HybridManipulate.php)[Manipulate](src/Manipulate.php) class contains methods for creating (inserting), moving and deleting nodes in nested set model.
 It also has createRootNode method that creates a root node that serves as a container for all other nodes.
 
 Example:
@@ -93,7 +93,7 @@ $manipulate->moveBefore([5,6,26,88], 33);
 
 ## Retrieving records
 
-[Find](src/Find.php) class contains methods for retrieving records and their names pretty much explain what they do.
+[(Hybrid)](src/HybridFind.php)[Find](src/Find.php) class contains methods for retrieving records and their names pretty much explain what they do.
 All you need is to provide them with node identifier.
 
 ```php
