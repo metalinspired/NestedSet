@@ -66,7 +66,7 @@ class Factory
             case 'manipulate':
                 return $this->manipulate();
             case 'hybridfind':
-                return $this->hybridManipulate();
+                return $this->hybridFind();
             case 'hybridmanipulate':
                 return $this->hybridManipulate();
             default:
