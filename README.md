@@ -17,6 +17,14 @@ $ composer require metalinspired/nested-set
 ```
 
 # Usage
+
+## (Hybrid) Nested Set
+Nested Set requires only `left` and `right` columns in table to represent a tree structure.
+Hybrid Nested Set requires additional `parent`, `ordering` and `depth` columns. 
+This addition makes manipulation more complex but greatly simplifies retrieval of nodes.
+For example, in order to find siblings of a node we simply query for nodes with same parent, instead of using `join` to find parent and `join` to get parent's immediate descendants.
+`Ordering` column is used to represent natural order of nodes.
+
 ## Config object
 
 [Config](src/Config.php) class, as name suggests, is used to create an object with predefined configuration for manipulation/selection classes in this utility, and you do so by changing values of its public members.
@@ -74,6 +82,14 @@ $manipulate->delete($node);
 // or enter a node identifier as second parameter to move descendants to a new location
 $manipulate->clean($parentNode, $destinationNode);
 ```
+
+Manipulation methods, excluding `insert`, can also accept array of node identifiers as their first argument, meaning you can `move`, `delete` and `clean` multiple nodes with just one call.
+
+Example:
+``` php
+$manipulate->moveBefore([5,6,26,88], 33);
+```
+
 
 ## Retrieving records
 
