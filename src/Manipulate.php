@@ -592,7 +592,7 @@ class Manipulate extends AbstractNestedSet
     }
 
     /**
-     * Inserts new node with provided data
+     * Create a node with provided data
      *
      * @param int|string $parent Identifier of parent node
      * @param array      $data   Data for new node
@@ -727,7 +727,7 @@ class Manipulate extends AbstractNestedSet
     }
 
     /**
-     * Move a node after destination node
+     * Move node(s) after destination node
      *
      * @see move()
      * @param $source
@@ -740,7 +740,7 @@ class Manipulate extends AbstractNestedSet
     }
 
     /**
-     * Move a node before destination node
+     * Move node(s) before destination node
      *
      * @see move()
      * @param $source
@@ -753,7 +753,7 @@ class Manipulate extends AbstractNestedSet
     }
 
     /**
-     * Move a node to become a child of destination node
+     * Move node(s) to become a child of destination node
      *
      * @see move()
      * @param $source
@@ -766,7 +766,7 @@ class Manipulate extends AbstractNestedSet
     }
 
     /**
-     * Deletes a node
+     * Delete node(s)
      *
      * @param int|string|array $id Identifier of source node or array of identifiers
      * @return int                 Number of nodes deleted
@@ -803,7 +803,7 @@ class Manipulate extends AbstractNestedSet
     }
 
     /**
-     * Empties a node by removing its descendants
+     * Empty node(s) by removing its descendants
      * or by moving them to a new location
      *
      * @param int|string|array $parents     Identifier of parent node or array with identifiers

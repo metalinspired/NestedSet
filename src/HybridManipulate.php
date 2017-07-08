@@ -716,7 +716,7 @@ class HybridManipulate extends Manipulate
     }
 
     /**
-     * Moves node within a same parent
+     * Move node within a same parent
      *
      * @param string|int $id    Node identifier
      * @param int        $order Order column value of target node or 0 to reorder as last node in parent
