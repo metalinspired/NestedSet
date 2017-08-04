@@ -5,68 +5,199 @@ namespace metalinspired\NestedSet;
 use metalinspired\NestedSet\Exception\InvalidNodeIdentifierException;
 use metalinspired\NestedSet\Exception\UnknownDbException;
 use Zend\Db\Adapter\Driver\ResultInterface;
-use Zend\Db\Adapter\Driver\StatementInterface;
 use Zend\Db\Sql\Expression;
+use Zend\Db\Sql\Predicate\Predicate;
 use Zend\Db\Sql\Select;
 
 class HybridFind extends Find
 {
     use HybridNestedSetTrait;
 
-    public function findDescendants($id)
+    /**
+     * {@inheritdoc}
+     */
+    public function getFindParentQuery($columns = null)
     {
+        $select = new Select(['t' => $this->table]);
+
+        $select
+            ->columns($columns ? $columns : $this->columns)
+            ->order("t.{$this->leftColumn} DESC")
+            ->join(
+                ['q' => $this->table],
+                "q.{$this->parentColumn} = t.{$this->idColumn}" .
+                ($this->includeSearchingNode ? " OR q.{$this->idColumn} = t.{$this->idColumn}" : ''),
+                []
+            )
+            ->where
+            ->greaterThan(
+                "t.{$this->idColumn}",
+                $this->getRootNodeId()
+            )
+            ->equalTo(
+                "q.{$this->idColumn}",
+                new Expression(':id')
+            );
+
+        return $select;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getFindDescendantsQuery(
+        $columns = null,
+        $order = null,
+        Predicate $where = null,
+        $depthLimit = null
+    ) {
+        $select = new Select(['t' => $this->table]);
+
+        $select
+            ->columns($columns ? $columns : $this->columns)
+            ->join(
+                ['q' => $this->table],
+                "t.{$this->leftColumn} > q.{$this->leftColumn} " .
+                "AND t.{$this->rightColumn} < q.{$this->rightColumn}" .
+                ($this->includeSearchingNode ? " OR q.{$this->idColumn} = t.{$this->idColumn}" : ''),
+                []
+            )
+            ->group("t.{$this->idColumn}")
+            ->order($order ? $order : "t.{$this->leftColumn}")
+            ->where
+            ->equalTo(
+                "q.{$this->idColumn}",
+                new Expression(':id')
+            );
+
+        if ($where) {
+            $select
+                ->where
+                ->predicate($where);
+        }
+
+        $depthLimit = $depthLimit ? $depthLimit : $this->depthLimit;
+
+        if ($depthLimit) {
+            $select
+                ->where
+                ->lessThanOrEqualTo(
+                    "t.{$this->depthColumn}",
+                    new Expression(
+                        '? + ?',
+                        [
+                            ["q.{$this->depthColumn}" => Expression::TYPE_IDENTIFIER],
+                            $depthLimit,
+                        ]
+                    )
+                );
+        }
+
+        return $select;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getFindChildrenQuery(
+        $columns = null,
+        $order = null,
+        Predicate $where = null
+    ) {
+        $subSelect = new Select(['parent'=> $this->table]);
+
+        $subSelect
+            ->columns([])
+            ->join(
+                ['children' => $this->table],
+                "children.{$this->parentColumn} = parent.{$this->idColumn}" .
+                ($this->includeSearchingNode ? " OR children.id = parent.{$this->idColumn}" : ''),
+                ['id' => $this->idColumn]
+            )
+            ->where
+            ->equalTo(
+                "parent.{$this->idColumn}",
+                new Expression(':id')
+            );
+
+
+        $select = new Select(['q' => $subSelect]);
+
+        $select
+            ->columns([])
+            ->join(
+                ['t' => $this->table],
+                "q.id = t.id",
+                $columns ? $columns : $this->columns
+            )
+            ->order($order ? $order : "t.{$this->leftColumn}");
+
+        if ($where) {
+            $select
+                ->where
+                ->predicate($where);
+        }
+
+        return $select;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getFindSiblingsQuery($columns = null, $order = null, Predicate $where = null)
+    {
+        $select = new Select(['t' => $this->table]);
+
+        $select
+            ->columns($columns ? $columns : $this->columns)
+            ->join(
+                [
+                    'q' => (new Select($this->table))
+                        ->columns([
+                            'id' => $this->idColumn,
+                            'parent' => $this->parentColumn,
+                        ], false)
+                        ->group('id'),
+                ],
+                "q.parent = t.{$this->parentColumn}" .
+                (! $this->includeSearchingNode ? " AND q.{$this->idColumn} <> t.{$this->idColumn}" : ''),
+                []
+            )
+            ->order($order ? $order : "t.{$this->leftColumn}")
+            ->where
+            ->equalTo(
+                "q.{$this->idColumn}",
+                new Expression(':id')
+            );
+
+        if ($where) {
+            $select
+                ->where
+                ->predicate($where);
+        }
+
+        return $select;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function findDescendants(
+        $id,
+        $columns = null,
+        $order = null,
+        Predicate $where = null,
+        $depthLimit = null
+    ) {
         if (! is_int($id) && ! is_string($id)) {
             throw new InvalidNodeIdentifierException($id);
         }
 
-        if (! array_key_exists('hybrid_find_descendants', $this->statements)) {
-            $select = new Select(['t' => $this->table]);
-
-            $select
-                ->columns($this->columns)
-                ->join(
-                    ['q' => $this->table],
-                    "t.{$this->leftColumn} > q.{$this->leftColumn} " .
-                    "AND t.{$this->rightColumn} < q.{$this->rightColumn}" .
-                    ($this->includeSearchingNode ? " OR q.{$this->idColumn} = t.{$this->idColumn}" : ''),
-                    []
-                )
-                ->group("t.{$this->idColumn}")
-                ->order("t.{$this->leftColumn}")
-                ->where
-                ->equalTo(
-                    "q.{$this->idColumn}",
-                    new Expression(':id')
-                );
-
-            if ($this->depthLimit) {
-                $select
-                    ->where
-                    ->lessThanOrEqualTo(
-                        "t.{$this->depthColumn}",
-                        new Expression(
-                            '? + ?',
-                            [
-                                ["q.{$this->depthColumn}" => Expression::TYPE_IDENTIFIER],
-                                new Expression(':depth')
-                            ]
-                        )
-                    );
-            }
-
-            $this->statements['hybrid_find_descendants'] = $this->sql->prepareStatementForSqlObject($select);
-        }
-
-        /** @var StatementInterface $statement */
-        $statement = $this->statements['hybrid_find_descendants'];
+        $query = $this->getFindDescendantsQuery($columns, $order, $where, $depthLimit);
 
         $parameters = [':id' => $id];
 
-        if ($this->depthLimit) {
-            $parameters[':depth'] = $this->depthLimit;
-        }
-
-        $result = $statement->execute($parameters);
+        $result = $this->sql->prepareStatementForSqlObject($query)->execute($parameters);
 
         if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
             throw new UnknownDbException();
@@ -75,47 +206,24 @@ class HybridFind extends Find
         return $result;
     }
 
-    public function findChildren($id)
-    {
+    /**
+     * {@inheritdoc}
+     */
+    public function findChildren(
+        $id,
+        $columns = null,
+        $order = null,
+        Predicate $where = null
+    ) {
         if (! is_int($id) && ! is_string($id)) {
             throw new InvalidNodeIdentifierException($id);
         }
 
-        if (! array_key_exists('hybrid_find_children', $this->statements)) {
-            $select = new Select($this->table);
-
-            $select
-                ->columns($this->columns)
-                ->order($this->leftColumn)
-                ->where
-                ->equalTo(
-                    $this->parentColumn,
-                    new Expression(':id')
-                );
-
-            if ($this->includeSearchingNode) {
-                $select
-                    ->where
-                    ->or
-                    ->equalTo(
-                        $this->idColumn,
-                        new Expression(':sId')
-                    );
-            }
-
-            $this->statements['hybrid_find_children'] = $this->sql->prepareStatementForSqlObject($select);
-        }
-
-        /** @var StatementInterface $statement */
-        $statement = $this->statements['hybrid_find_children'];
+        $query = $this->getFindChildrenQuery($columns, $order, $where);
 
         $parameters = [':id' => $id];
 
-        if ($this->includeSearchingNode) {
-            $parameters[':sId'] = $id;
-        }
-
-        $result = $statement->execute($parameters);
+        $result = $this->sql->prepareStatementForSqlObject($query)->execute($parameters);
 
         if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
             throw new UnknownDbException();
@@ -124,43 +232,20 @@ class HybridFind extends Find
         return $result;
     }
 
-    public function findParent($id)
+    /**
+     * {@inheritdoc}
+     */
+    public function findParent($id, $columns = null)
     {
         if (! is_int($id) && ! is_string($id)) {
             throw new InvalidNodeIdentifierException($id);
         }
 
-        if (! array_key_exists('hybrid_find_parent', $this->statements)) {
-            $select = new Select(['t' => $this->table]);
-
-            $select
-                ->columns($this->columns)
-                ->order("t.{$this->leftColumn} DESC")
-                ->join(
-                    ['q' => $this->table],
-                    "q.{$this->parentColumn} = t.{$this->idColumn}" .
-                    ($this->includeSearchingNode ? " OR q.{$this->idColumn} = t.{$this->idColumn}" : ''),
-                    []
-                )
-                ->where
-                ->greaterThan(
-                    "t.{$this->idColumn}",
-                    $this->getRootNodeId()
-                )
-                ->equalTo(
-                    "q.{$this->idColumn}",
-                    new Expression(':id')
-                );
-
-            $this->statements['hybrid_find_parent'] = $this->sql->prepareStatementForSqlObject($select);
-        }
-
-        /** @var StatementInterface $statement */
-        $statement = $this->statements['hybrid_find_parent'];
+        $query = $this->getFindParentQuery($columns);
 
         $parameters = [':id' => $id];
 
-        $result = $statement->execute($parameters);
+        $result = $this->sql->prepareStatementForSqlObject($query)->execute($parameters);
 
         if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
             throw new UnknownDbException();
@@ -169,46 +254,24 @@ class HybridFind extends Find
         return $result;
     }
 
-    public function findSiblings($id)
-    {
+    /**
+     * {@inheritdoc}
+     */
+    public function findSiblings(
+        $id,
+        $columns = null,
+        $order = null,
+        Predicate $where = null
+    ) {
         if (! is_int($id) && ! is_string($id)) {
             throw new InvalidNodeIdentifierException($id);
         }
 
-        if (! array_key_exists('hybrid_find_sibling', $this->statements)) {
-            $select = new Select(['t' => $this->table]);
-
-            $select
-                ->columns($this->columns)
-                ->join(
-                    [
-                        'q' => (new Select($this->table))
-                            ->columns([
-                                'id' => $this->idColumn,
-                                'parent' => $this->parentColumn
-                            ], false)
-                            ->group('id')
-                    ],
-                    "q.parent = t.{$this->parentColumn}" .
-                    (! $this->includeSearchingNode ? " AND q.{$this->idColumn} <> t.{$this->idColumn}" : ''),
-                    []
-                )
-                ->order("t.{$this->leftColumn}")
-                ->where
-                ->equalTo(
-                    "q.{$this->idColumn}",
-                    new Expression(':id')
-                );
-
-            $this->statements['hybrid_find_sibling'] = $this->sql->prepareStatementForSqlObject($select);
-        }
-
-        /** @var StatementInterface $statement */
-        $statement = $this->statements['hybrid_find_sibling'];
+        $query = $this->getFindSiblingsQuery($columns, $order, $where);
 
         $parameters = [':id' => $id];
 
-        $result = $statement->execute($parameters);
+        $result = $this->sql->prepareStatementForSqlObject($query)->execute($parameters);
 
         if (! $result instanceof ResultInterface || ! $result->isQueryResult()) {
             throw new UnknownDbException();
