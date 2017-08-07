@@ -125,6 +125,9 @@ abstract class AbstractNestedSet
 
         $this->statements = [];
         $this->table = $table;
+        if ($this->sql) {
+            $this->sql->setTable($table);
+        }
 
         return $this;
     }
@@ -233,18 +236,26 @@ abstract class AbstractNestedSet
         return $this;
     }
 
+    /**
+     * @return Sql
+     */
+    public function getSql()
+    {
+        return $this->sql;
+    }
+
     protected function detectRootNodeId()
     {
         $selectLft = new Select($this->table);
         $selectLft
             ->columns([
-                'lft' => new Expression('MIN(' . $this->leftColumn . ')')
+                'lft' => new Expression('MIN(' . $this->leftColumn . ')'),
             ], false);
 
         $selectRgt = new Select($this->table);
         $selectRgt
             ->columns([
-                'rgt' => new Expression('MAX(' . $this->rightColumn . ')')
+                'rgt' => new Expression('MAX(' . $this->rightColumn . ')'),
             ], false);
 
         $select = new Select(['root' => $this->table]);
@@ -266,7 +277,7 @@ abstract class AbstractNestedSet
                 new Expression(
                     '?',
                     [
-                        ["lft.lft" => Expression::TYPE_IDENTIFIER]
+                        ["lft.lft" => Expression::TYPE_IDENTIFIER],
                     ]
                 )
             )
@@ -275,7 +286,7 @@ abstract class AbstractNestedSet
                 new Expression(
                     '?',
                     [
-                        ["rgt.rgt" => Expression::TYPE_IDENTIFIER]
+                        ["rgt.rgt" => Expression::TYPE_IDENTIFIER],
                     ]
                 )
             );
@@ -325,7 +336,7 @@ abstract class AbstractNestedSet
             }
         }
 
-        $this->sql = new Sql($this->adapter);
+        $this->sql = new Sql($this->adapter, $this->table);
 
         return $this;
     }
