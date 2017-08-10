@@ -16,8 +16,10 @@ class HybridFind extends Find
     /**
      * {@inheritdoc}
      */
-    public function getFindParentQuery($columns = null)
+    public function getFindParentQuery($columns = null, $includeSearchingNode = null)
     {
+        $includeSearchingNode = is_null($includeSearchingNode) ? $this->includeSearchingNode : $includeSearchingNode;
+
         $select = new Select(['t' => $this->table]);
 
         $select
@@ -26,7 +28,7 @@ class HybridFind extends Find
             ->join(
                 ['q' => $this->table],
                 "q.{$this->parentColumn} = t.{$this->idColumn}" .
-                ($this->includeSearchingNode ? " OR q.{$this->idColumn} = t.{$this->idColumn}" : ''),
+                ($includeSearchingNode ? " OR q.{$this->idColumn} = t.{$this->idColumn}" : ''),
                 []
             )
             ->where
@@ -49,8 +51,11 @@ class HybridFind extends Find
         $columns = null,
         $order = null,
         Predicate $where = null,
-        $depthLimit = null
+        $depthLimit = null,
+        $includeSearchingNode = null
     ) {
+        $includeSearchingNode = is_null($includeSearchingNode) ? $this->includeSearchingNode : $includeSearchingNode;
+
         $select = new Select(['t' => $this->table]);
 
         $select
@@ -59,7 +64,7 @@ class HybridFind extends Find
                 ['q' => $this->table],
                 "t.{$this->leftColumn} > q.{$this->leftColumn} " .
                 "AND t.{$this->rightColumn} < q.{$this->rightColumn}" .
-                ($this->includeSearchingNode ? " OR q.{$this->idColumn} = t.{$this->idColumn}" : ''),
+                ($includeSearchingNode ? " OR q.{$this->idColumn} = t.{$this->idColumn}" : ''),
                 []
             )
             ->group("t.{$this->idColumn}")
@@ -102,16 +107,19 @@ class HybridFind extends Find
     public function getFindChildrenQuery(
         $columns = null,
         $order = null,
-        Predicate $where = null
+        Predicate $where = null,
+        $includeSearchingNode = null
     ) {
-        $subSelect = new Select(['parent'=> $this->table]);
+        $includeSearchingNode = is_null($includeSearchingNode) ? $this->includeSearchingNode : $includeSearchingNode;
+
+        $subSelect = new Select(['parent' => $this->table]);
 
         $subSelect
             ->columns([])
             ->join(
                 ['children' => $this->table],
                 "children.{$this->parentColumn} = parent.{$this->idColumn}" .
-                ($this->includeSearchingNode ? " OR children.id = parent.{$this->idColumn}" : ''),
+                ($includeSearchingNode ? " OR children.id = parent.{$this->idColumn}" : ''),
                 ['id' => $this->idColumn]
             )
             ->where
@@ -144,8 +152,14 @@ class HybridFind extends Find
     /**
      * {@inheritdoc}
      */
-    public function getFindSiblingsQuery($columns = null, $order = null, Predicate $where = null)
-    {
+    public function getFindSiblingsQuery(
+        $columns = null,
+        $order = null,
+        Predicate $where = null,
+        $includeSearchingNode = null
+    ) {
+        $includeSearchingNode = is_null($includeSearchingNode) ? $this->includeSearchingNode : $includeSearchingNode;
+
         $select = new Select(['t' => $this->table]);
 
         $select
@@ -160,7 +174,7 @@ class HybridFind extends Find
                         ->group('id'),
                 ],
                 "q.parent = t.{$this->parentColumn}" .
-                (! $this->includeSearchingNode ? " AND q.{$this->idColumn} <> t.{$this->idColumn}" : ''),
+                (! $includeSearchingNode ? " AND q.{$this->idColumn} <> t.{$this->idColumn}" : ''),
                 []
             )
             ->order($order ? $order : "t.{$this->leftColumn}")
@@ -187,13 +201,14 @@ class HybridFind extends Find
         $columns = null,
         $order = null,
         Predicate $where = null,
-        $depthLimit = null
+        $depthLimit = null,
+        $includeSearchingNode = null
     ) {
         if (! is_int($id) && ! is_string($id)) {
             throw new InvalidNodeIdentifierException($id);
         }
 
-        $query = $this->getFindDescendantsQuery($columns, $order, $where, $depthLimit);
+        $query = $this->getFindDescendantsQuery($columns, $order, $where, $depthLimit, $includeSearchingNode);
 
         $parameters = [':id' => $id];
 
@@ -213,13 +228,14 @@ class HybridFind extends Find
         $id,
         $columns = null,
         $order = null,
-        Predicate $where = null
+        Predicate $where = null,
+        $includeSearchingNode = null
     ) {
         if (! is_int($id) && ! is_string($id)) {
             throw new InvalidNodeIdentifierException($id);
         }
 
-        $query = $this->getFindChildrenQuery($columns, $order, $where);
+        $query = $this->getFindChildrenQuery($columns, $order, $where, $includeSearchingNode);
 
         $parameters = [':id' => $id];
 
@@ -235,13 +251,13 @@ class HybridFind extends Find
     /**
      * {@inheritdoc}
      */
-    public function findParent($id, $columns = null)
+    public function findParent($id, $columns = null, $includeSearchingNode = null)
     {
         if (! is_int($id) && ! is_string($id)) {
             throw new InvalidNodeIdentifierException($id);
         }
 
-        $query = $this->getFindParentQuery($columns);
+        $query = $this->getFindParentQuery($columns, $includeSearchingNode);
 
         $parameters = [':id' => $id];
 
@@ -261,13 +277,14 @@ class HybridFind extends Find
         $id,
         $columns = null,
         $order = null,
-        Predicate $where = null
+        Predicate $where = null,
+        $includeSearchingNode = null
     ) {
         if (! is_int($id) && ! is_string($id)) {
             throw new InvalidNodeIdentifierException($id);
         }
 
-        $query = $this->getFindSiblingsQuery($columns, $order, $where);
+        $query = $this->getFindSiblingsQuery($columns, $order, $where, $includeSearchingNode);
 
         $parameters = [':id' => $id];
 
