@@ -28,7 +28,7 @@ For example, in order to find siblings of a node we simply query for nodes with 
 ## Config object
 
 [Config](src/Config.php) class, as name suggests, is used to create an object with predefined configuration for manipulation/selection classes in this utility, and you do so by changing values of its public members.
-It also has three static methods that create instance of Config object and set its *$adapter* member to an *Zend\DB\Adapter\Driver\\** instance.
+It also has three static methods that create instance of Config object and set its *$adapter* member to an *Zend\DB\Adapter\Driver* instance.
 
 Example:
 
@@ -39,7 +39,7 @@ $config = Config::createWithDsn('mysql:dbname=some_database;host=localhost', 'so
 // Set table name
 $config->table = 'some_table';
  
-// If we don't want to retrieve all columns when using find* methods 
+// If we don't want to retrieve all columns when using find methods 
 // we specify which columns we want to fetch
 $config->columns = ['column1', 'column5', 'alias_of_column' => 'column7'];
 
@@ -50,7 +50,7 @@ $config->includeSearchingNode = true;
 
 ## Manipulation
 
-[(Hybrid)](src/HybridManipulate.php)[Manipulate](src/Manipulate.php) class contains methods for creating (inserting), moving and deleting nodes in nested set model.
+[HybridManipulate](src/HybridFind.php) and [Manipulate](src/Find.php) classes contain methods for creating (inserting), moving and deleting nodes in nested set model.
 It also has createRootNode method that creates a root node that serves as a container for all other nodes.
 
 Example:
@@ -90,11 +90,15 @@ Example:
 $manipulate->moveBefore([5,6,26,88], 33);
 ```
 
+[HybridManipulate](src/HybridManipulate.php) class has extra method named `reorder`.
+It allows you to move a node within its parent by using order column value as destination instead of node identifier.
+
 
 ## Retrieving records
 
-[(Hybrid)](src/HybridFind.php)[Find](src/Find.php) class contains methods for retrieving records and their names pretty much explain what they do.
-All you need is to provide them with node identifier.
+[HybridFind](src/HybridFind.php) and [Find](src/Find.php) classes contain methods for retrieving records and their names pretty much explain what they do.
+All you need is to provide them with node identifier (*$id* argument), all other arguments are options.
+For arguments list please refer to each function source;
 
 ```php
 // Create instance of Find class
@@ -109,6 +113,18 @@ $find->findLastChild();
 $find->findSiblings();
 $find->findNextSibling();
 $find->findPreviousSibling();
+```
+
+Each of these methods have an (almost) equal get\*Query method (for example `getFindAncestorsQuery`) which returns [Select](https://github.com/zendframework/zend-db/blob/master/src/Sql/Select.php) object instead of [ResultInterface](https://github.com/zendframework/zend-db/blob/master/src/Adapter/Driver/ResultInterface.php).
+Unlike find methods these methods do not take identifier as argument but instead define an *:id* placeholder.
+For usage example simply look at one of find* methods.
+
+__Important note:__ Unlike *$columns* or *$where* arguments, when using *$order* argument you must match column names with table `t` (`t` is an alias for table you are querying), for example:
+```php
+$where = new Where();
+$where->equalTo('column3', 'some_value');
+ 
+$find->findChildren(3, ['alias' => 'column1', 'column2'], 't.column4 ASC', $where); 
 ```
 
 ## Factory

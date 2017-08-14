@@ -15,10 +15,6 @@
  *     the documentation and/or other materials provided with the
  *     distribution.
  *
- *  3. Neither the name of the copyright holder nor the names of its
- *     contributors may be used to endorse or promote products derived
- *     from this software without specific prior written permission.
- *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -34,7 +30,7 @@
  *
  * @author      Milan Divkovic <metalinspired@gmail.com>
  * @copyright   2017 Milan Divkovic.
- * @license     http://opensource.org/licenses/BSD-3-Clause
+ * @license     http://opensource.org/licenses/BSD-license FreeBSD License
  */
 
 namespace metalinspired\NestedSetTest\HybridNestedSet;
